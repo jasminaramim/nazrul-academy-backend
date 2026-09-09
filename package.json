@@ -2,6 +2,7 @@
   "name": "nazrul-academy-backend",
   "version": "1.0.0",
   "description": "Trishal Nazrul Academy - Backend API Server",
+  "type": "module",
   "main": "server.ts",
   "scripts": {
     "dev": "tsx server.ts",
