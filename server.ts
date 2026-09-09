@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
-import routes from './routes';
+import routes from './routes/index';
 import { connectDB } from './config/dbConfig';
 
 // Load env - works both locally and on Vercel (via Vercel env vars)
