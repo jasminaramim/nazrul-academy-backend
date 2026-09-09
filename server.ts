@@ -1,23 +1,17 @@
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
-import routes from './routes/index.js';
-import { connectDB } from './config/dbConfig.js';
+import routes from './routes';
+import { connectDB } from './config/dbConfig';
 
-// __dirname equivalent in ESM
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Load .env from backend folder
-dotenv.config({ path: path.join(__dirname, '.env') });
+// Load env - works both locally and on Vercel (via Vercel env vars)
+dotenv.config();
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;
 
 const app = express();
 
-// CORS: Allow frontend URLs
+// CORS
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
@@ -30,7 +24,7 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, true); // allow all for now, tighten later
     }
   },
   credentials: true,
@@ -68,11 +62,7 @@ app.get('/', (_req, res) => {
       padding: 2rem;
       color: #e2e8f0;
     }
-    .container {
-      max-width: 700px;
-      width: 100%;
-      text-align: center;
-    }
+    .container { max-width: 700px; width: 100%; text-align: center; }
     .badge {
       display: inline-flex;
       align-items: center;
@@ -97,10 +87,7 @@ app.get('/', (_req, res) => {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.5; transform: scale(0.8); }
     }
-    .logo {
-      font-size: 3.5rem;
-      margin-bottom: 0.5rem;
-    }
+    .logo { font-size: 3.5rem; margin-bottom: 0.5rem; }
     h1 {
       font-size: 2.5rem;
       font-weight: 800;
@@ -110,14 +97,10 @@ app.get('/', (_req, res) => {
       background-clip: text;
       margin-bottom: 0.5rem;
     }
-    .subtitle {
-      color: #94a3b8;
-      font-size: 1rem;
-      margin-bottom: 3rem;
-    }
+    .subtitle { color: #94a3b8; font-size: 1rem; margin-bottom: 3rem; }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 1rem;
       margin-bottom: 2.5rem;
     }
@@ -126,7 +109,6 @@ app.get('/', (_req, res) => {
       border: 1px solid rgba(255,255,255,0.1);
       border-radius: 16px;
       padding: 1.5rem 1rem;
-      backdrop-filter: blur(10px);
       transition: transform 0.2s, border-color 0.2s;
     }
     .card:hover { transform: translateY(-3px); border-color: rgba(129,140,248,0.4); }
@@ -141,13 +123,7 @@ app.get('/', (_req, res) => {
       text-align: left;
       margin-bottom: 2rem;
     }
-    .endpoints h3 {
-      font-size: 13px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #64748b;
-      margin-bottom: 1rem;
-    }
+    .endpoints h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; margin-bottom: 1rem; }
     .endpoint {
       display: flex;
       align-items: center;
@@ -168,8 +144,6 @@ app.get('/', (_req, res) => {
       text-align: center;
     }
     .method.post { background: rgba(251,191,36,0.15); color: #fbbf24; }
-    .method.put { background: rgba(52,211,153,0.15); color: #34d399; }
-    .method.del { background: rgba(248,113,113,0.15); color: #f87171; }
     .path { color: #cbd5e1; font-family: monospace; }
     .desc { color: #64748b; margin-left: auto; font-size: 12px; }
     .footer { color: #475569; font-size: 13px; }
@@ -178,15 +152,10 @@ app.get('/', (_req, res) => {
 </head>
 <body>
   <div class="container">
-    <div class="badge">
-      <div class="dot"></div>
-      API ONLINE
-    </div>
-
+    <div class="badge"><div class="dot"></div>API ONLINE</div>
     <div class="logo">🏫</div>
     <h1>Nazrul Academy API</h1>
     <p class="subtitle">ত্রিশাল সরকারি নজরুল একাডেমি — Backend REST API Server</p>
-
     <div class="grid">
       <div class="card">
         <div class="card-icon">⚡</div>
@@ -209,51 +178,17 @@ app.get('/', (_req, res) => {
         <div class="card-value" style="font-size:0.85rem">/api</div>
       </div>
     </div>
-
     <div class="endpoints">
-      <h3>📋 API Endpoints</h3>
-      <div class="endpoint">
-        <span class="method">GET</span>
-        <span class="path">/api/hero</span>
-        <span class="desc">Hero Slides</span>
-      </div>
-      <div class="endpoint">
-        <span class="method">GET</span>
-        <span class="path">/api/teachers</span>
-        <span class="desc">Teacher Messages</span>
-      </div>
-      <div class="endpoint">
-        <span class="method">GET</span>
-        <span class="path">/api/students</span>
-        <span class="desc">Students</span>
-      </div>
-      <div class="endpoint">
-        <span class="method">GET</span>
-        <span class="path">/api/notices</span>
-        <span class="desc">Notices</span>
-      </div>
-      <div class="endpoint">
-        <span class="method">GET</span>
-        <span class="path">/api/schedule</span>
-        <span class="desc">Schedule</span>
-      </div>
-      <div class="endpoint">
-        <span class="method">GET</span>
-        <span class="path">/api/gallery</span>
-        <span class="desc">Gallery</span>
-      </div>
-      <div class="endpoint">
-        <span class="method post">POST</span>
-        <span class="path">/api/auth/login</span>
-        <span class="desc">Admin Login</span>
-      </div>
-      <div class="endpoint">
-        <span class="method">GET</span>
-        <span class="path">/health</span>
-        <span class="desc">Health Check (JSON)</span>
-      </div>
+      <h3>📋 Available Endpoints</h3>
+      <div class="endpoint"><span class="method">GET</span><span class="path">/api/hero</span><span class="desc">Hero Slides</span></div>
+      <div class="endpoint"><span class="method">GET</span><span class="path">/api/teachers</span><span class="desc">Teachers</span></div>
+      <div class="endpoint"><span class="method">GET</span><span class="path">/api/students</span><span class="desc">Students</span></div>
+      <div class="endpoint"><span class="method">GET</span><span class="path">/api/notices</span><span class="desc">Notices</span></div>
+      <div class="endpoint"><span class="method">GET</span><span class="path">/api/gallery</span><span class="desc">Gallery</span></div>
+      <div class="endpoint"><span class="method">GET</span><span class="path">/api/schedule</span><span class="desc">Schedule</span></div>
+      <div class="endpoint"><span class="method post">POST</span><span class="path">/api/auth/login</span><span class="desc">Admin Login</span></div>
+      <div class="endpoint"><span class="method">GET</span><span class="path">/health</span><span class="desc">Health JSON</span></div>
     </div>
-
     <p class="footer">Built with ❤️ for <span>Trishal Nazrul Academy</span> • ${new Date().getFullYear()}</p>
   </div>
 </body>
@@ -265,21 +200,20 @@ app.get('/health', (_req, res) => {
   res.json({ success: true, message: 'Backend is running!', timestamp: new Date().toISOString() });
 });
 
-
-// DB connection cache for serverless
+// DB connection cache for Vercel serverless warm invocations
 let isDbConnected = false;
 
-// For Vercel Serverless - export app as handler
+// Vercel Serverless handler - this is what Vercel calls
 export default async function handler(req: any, res: any) {
   if (!isDbConnected) {
-    await connectDB();
-    isDbConnected = true;
+    const result = await connectDB();
+    if (result.success) isDbConnected = true;
   }
   return app(req, res);
 }
 
-// For local development - start server directly
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+// Local development only
+if (!process.env.VERCEL) {
   connectDB().then(() => {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ Backend server running: http://localhost:${PORT}`);
