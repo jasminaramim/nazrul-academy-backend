@@ -93,3 +93,57 @@ export const seedDemoData = async (req: Request, res: Response) => {
   res.json({ success: true, message: 'Demo data seeder disabled in Mongoose migration' });
 };
 
+import { User } from '../model/userModel';
+import { Student } from '../model/studentModel';
+
+export const approveRegistration = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const student = await Student.findOne({ id });
+    if (!student) return res.status(404).json({ success: false, message: 'শিক্ষার্থী পাওয়া যায়নি' });
+
+    const user = await User.findOne({ email: student.email });
+    if (!user) return res.status(404).json({ success: false, message: 'ইউজার পাওয়া যায়নি' });
+    
+    if (student.status === 'approved' || user.status === 'approved') {
+      return res.status(400).json({ success: false, message: 'আগেই অনুমোদন করা হয়েছে' });
+    }
+
+    user.status = 'approved';
+    await user.save();
+
+    student.status = 'approved';
+    await student.save();
+
+    // Update Stats
+    await Stats.updateOne({}, { $inc: { registeredStudents: 1 } }, { upsert: true });
+
+    // Update Finance
+    let finance = await Finance.findOne();
+    if (!finance) finance = await Finance.create({});
+    
+    const fee = user.registrationFee || 0;
+    finance.totalIncome = (finance.totalIncome || 0) + fee;
+    finance.balance = (finance.totalIncome || 0) - (finance.totalExpense || 0);
+    
+    // Add transaction record
+    if (fee > 0) {
+      finance.transactions.push({
+        id: 'trx-' + Date.now(),
+        type: 'income',
+        amount: fee,
+        source: 'Registration',
+        name: user.name,
+        date: new Date().toISOString().split('T')[0]
+      });
+    }
+    
+    await finance.save();
+
+    console.log("message send success"); // User requested log
+
+    res.json({ success: true, message: 'রেজিস্ট্রেশন সফলভাবে অনুমোদন করা হয়েছে' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

@@ -15,8 +15,9 @@ export interface IStudent extends Document {
   currentJob?: string;
   company?: string;
   tshirtSize?: string;
-  familyMembersCount?: number;
   status: string;
+  registrationFee?: number;
+  transactionId?: string;
 }
 
 const studentSchema = new Schema<IStudent>({
@@ -34,8 +35,9 @@ const studentSchema = new Schema<IStudent>({
   currentJob: { type: String },
   company: { type: String },
   tshirtSize: { type: String },
-  familyMembersCount: { type: Number, default: 0 },
-  status: { type: String, default: 'approved' },
+  status: { type: String, default: 'pending' },
+  registrationFee: { type: Number },
+  transactionId: { type: String },
 }, { timestamps: true, strict: false });
 
 export const Student = mongoose.model<IStudent>('Student', studentSchema);

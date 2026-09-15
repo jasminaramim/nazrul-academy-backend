@@ -7,6 +7,9 @@ export interface IGlobalConfig extends Document {
   eventDate: string;
   eventVenue: string;
   registrationFee: string;
+  feeOldBatch: number;
+  feeNewBatch: number;
+  maxRegistrations: number;
   bkashNumber: string;
   nagadNumber: string;
   rocketNumber: string;
@@ -22,6 +25,9 @@ const globalConfigSchema = new Schema<IGlobalConfig>({
   eventDate: { type: String },
   eventVenue: { type: String },
   registrationFee: { type: String },
+  feeOldBatch: { type: Number, default: 1500 },
+  feeNewBatch: { type: Number, default: 1000 },
+  maxRegistrations: { type: Number, default: 8000 },
   bkashNumber: { type: String },
   nagadNumber: { type: String },
   rocketNumber: { type: String },
@@ -48,12 +54,10 @@ export const AdminInfo = mongoose.model<IAdminInfo>('AdminInfo', adminInfoSchema
 
 export interface IStats extends Document {
   registeredStudents: number;
-  familyMembersCount: number;
   totalDonation: number;
 }
 const statsSchema = new Schema<IStats>({
   registeredStudents: { type: Number, default: 0 },
-  familyMembersCount: { type: Number, default: 0 },
   totalDonation: { type: Number, default: 0 },
 }, { timestamps: true, strict: false });
 export const Stats = mongoose.model<IStats>('Stats', statsSchema);

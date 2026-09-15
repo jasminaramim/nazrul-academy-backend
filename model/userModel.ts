@@ -18,8 +18,9 @@ export interface IUser extends Document {
   status: string;
   createdAt: string;
   image?: string;
-  familyMembersCount?: number;
   tshirtSize?: string;
+  registrationFee?: number;
+  transactionId?: string;
 }
 
 const userSchema = new Schema<IUser>({
@@ -37,11 +38,12 @@ const userSchema = new Schema<IUser>({
   school: { type: String },
   currentJob: { type: String },
   company: { type: String },
-  status: { type: String, default: 'approved' },
+  status: { type: String, default: 'pending' },
   createdAt: { type: String },
   image: { type: String },
-  familyMembersCount: { type: Number, default: 0 },
   tshirtSize: { type: String },
+  registrationFee: { type: Number },
+  transactionId: { type: String },
 }, { timestamps: true });
 
 export const User = mongoose.model<IUser>('User', userSchema);

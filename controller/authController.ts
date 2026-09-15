@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../model/userModel';
 import { Student } from '../model/studentModel';
-import { Stats } from '../model/configModel';
+import { GlobalConfig, Stats } from '../model/configModel';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'trishal-nazrul-academy-secret-key-2026';
 const verificationCodes: Record<string, { code: string; expiresAt: number }> = {};
@@ -20,6 +20,33 @@ export const sendVerification = async (req: Request, res: Response) => {
     res.json({ success: true, message: `কোড (${code}) পাঠানো হয়েছে।`, code });
   } catch (err) {
     res.status(500).json({ success: false, message: 'সমস্যা হয়েছে' });
+  }
+};
+
+export const checkAvailability = async (req: Request, res: Response) => {
+  try {
+    const { email, phone, transactionId } = req.body;
+    let errors: Record<string, string> = {};
+
+    if (email) {
+      const existingUser = await User.findOne({ email: email.toLowerCase() });
+      if (existingUser) errors.email = 'এই ইমেইল দিয়ে ইতোমধ্যে একটি অ্যাকাউন্ট রয়েছে।';
+    }
+    
+    if (phone) {
+      const existingUser = await User.findOne({ phone });
+      const existingStudent = await Student.findOne({ phone });
+      if (existingUser || existingStudent) errors.phone = 'এই মোবাইল নম্বরটি ইতোমধ্যে ব্যবহৃত হয়েছে।';
+    }
+    
+    if (transactionId) {
+      const existingStudent = await Student.findOne({ transactionId });
+      if (existingStudent) errors.transactionId = 'এই ট্রানজ্যাকশন আইডি ইতোমধ্যে ব্যবহৃত হয়েছে।';
+    }
+
+    res.json({ success: true, errors });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'সার্ভার সমস্যা দেখা দিয়েছে' });
   }
 };
 
@@ -40,11 +67,18 @@ export const verifyOtp = async (req: Request, res: Response) => {
 
 export const register = async (req: Request, res: Response) => {
   try {
-    const { email, password, name, nameEn, bloodGroup, batch, location, school, currentJob, company, image, phone, familyMembersCount, tshirtSize } = req.body;
+    const { email, password, name, nameEn, bloodGroup, batch, location, school, currentJob, company, image, phone, tshirtSize, registrationFee, transactionId } = req.body;
     if (!email || !password || !name) return res.status(400).json({ success: false, message: 'ইমেইল, পাসওয়ার্ড, নাম আবশ্যক' });
 
     const existing = await User.findOne({ email: email.toLowerCase() });
     if (existing) return res.status(400).json({ success: false, message: 'অ্যাকাউন্ট রয়েছে' });
+
+    const config = await GlobalConfig.findOne() || await GlobalConfig.create({});
+    const stats = await Stats.findOne() || await Stats.create({});
+    
+    if (stats.registeredStudents >= (config.maxRegistrations || 8000)) {
+       return res.status(400).json({ success: false, message: 'রেজিস্ট্রেশন কোটা পূর্ণ হয়ে গেছে। আর নতুন রেজিস্ট্রেশন সম্ভব নয়।' });
+    }
 
     const passwordHash = await bcrypt.hash(password, 10);
     const isBatchOld = parseInt(batch?.replace(/\D/g, '') || '2026', 10) < 2011;
@@ -55,7 +89,9 @@ export const register = async (req: Request, res: Response) => {
       bloodGroup: bloodGroup || 'O+', batch: batch?.includes('ব্যাচ') ? batch : `ব্যাচ ${batch || '২০১০'}`,
       location: location || 'ত্রিশাল', school: school || 'ত্রিশাল একাডেমি', currentJob: currentJob || 'পেশাজীবী',
       company: company || '', image: image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&q=80',
-      phone: phone || '', familyMembersCount: Number(familyMembersCount) || 0, tshirtSize: tshirtSize || 'L'
+      phone: phone || '', tshirtSize: tshirtSize || 'L',
+      registrationFee: Number(registrationFee) || 0,
+      transactionId: transactionId || ''
     });
     await newUser.save();
 
@@ -64,11 +100,9 @@ export const register = async (req: Request, res: Response) => {
       batch: newUser.batch, batchType: isBatchOld ? 'old' : 'new', location: newUser.location,
       bloodGroup: newUser.bloodGroup, phone: newUser.phone, email: newUser.email, school: newUser.school,
       currentJob: newUser.currentJob, company: newUser.company, tshirtSize: newUser.tshirtSize,
-      familyMembersCount: newUser.familyMembersCount
+      registrationFee: newUser.registrationFee, transactionId: newUser.transactionId
     });
     await newStudent.save();
-
-    await Stats.updateOne({}, { $inc: { registeredStudents: 1, familyMembersCount: newUser.familyMembersCount || 0 } }, { upsert: true });
 
     const token = jwt.sign({ id: newUser.id, email: newUser.email, role: newUser.role, name: newUser.name }, JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({ success: true, message: 'নিবন্ধন সম্পন্ন', token, user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role, batch: newUser.batch, image: newUser.image, bloodGroup: newUser.bloodGroup, location: newUser.location } });

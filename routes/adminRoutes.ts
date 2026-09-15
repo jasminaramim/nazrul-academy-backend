@@ -6,7 +6,8 @@ import {
   getAdminInfo, updateAdminInfo,
   getFinance, updateFinance,
   getStats, updateStats,
-  getMongoConfig, updateMongoConfig, forceMongoSync, seedDemoData
+  getMongoConfig, updateMongoConfig, forceMongoSync, seedDemoData,
+  approveRegistration
 } from '../controller/adminController';
 
 const router = Router();
@@ -30,5 +31,7 @@ router.get('/system/mongo-config', getMongoConfig);
 router.post('/system/mongo-config', authenticateToken, requireAdmin, updateMongoConfig);
 router.post('/system/mongo-sync', authenticateToken, requireAdmin, forceMongoSync);
 router.post('/system/seed-demo-data', authenticateToken, requireAdmin, seedDemoData);
+
+router.put('/registrations/:id/approve', authenticateToken, requireAdmin, approveRegistration);
 
 export default router;
