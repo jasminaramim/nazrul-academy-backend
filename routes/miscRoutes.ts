@@ -13,8 +13,8 @@ import { uploadImage } from '../controller/uploadController';
 
 const router = Router();
 
-// Upload Route
-router.post('/upload', authenticateToken, requireAdmin, uploadImage);
+// Upload Route (Public for registration)
+router.post('/upload', uploadImage);
 
 // Media Routes - Donations
 router.get('/donations', getDonors);
