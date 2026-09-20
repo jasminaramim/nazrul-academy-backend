@@ -2,11 +2,18 @@ import { Router } from 'express';
 import { 
   getNotices, createNotice, updateNotice, deleteNotice,
   getSchedule, createSchedule, updateSchedule, deleteSchedule,
-  getCultural, createCultural, updateCultural, deleteCultural
+  getCultural, createCultural, updateCultural, deleteCultural,
+  getUpcomingEvents, createUpcomingEvent, updateUpcomingEvent, deleteUpcomingEvent
 } from '../controller/eventController';
 import { authenticateToken, requireAdmin } from '../middleware/authMiddleware';
 
 const router = Router();
+
+// Upcoming Events / Activity Posters
+router.get('/upcoming-events', getUpcomingEvents);
+router.post('/upcoming-events', authenticateToken, requireAdmin, createUpcomingEvent);
+router.put('/upcoming-events/:id', authenticateToken, requireAdmin, updateUpcomingEvent);
+router.delete('/upcoming-events/:id', authenticateToken, requireAdmin, deleteUpcomingEvent);
 
 router.get('/notices', getNotices);
 router.post('/notices', authenticateToken, requireAdmin, createNotice);

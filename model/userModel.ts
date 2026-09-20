@@ -21,6 +21,7 @@ export interface IUser extends Document {
   tshirtSize?: string;
   registrationFee?: number;
   transactionId?: string;
+  paymentMethod?: string;
 }
 
 const userSchema = new Schema<IUser>({
@@ -44,6 +45,7 @@ const userSchema = new Schema<IUser>({
   tshirtSize: { type: String },
   registrationFee: { type: Number },
   transactionId: { type: String },
+  paymentMethod: { type: String },
 }, { timestamps: true });
 
 export const User = mongoose.model<IUser>('User', userSchema);

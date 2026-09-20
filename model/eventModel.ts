@@ -54,3 +54,38 @@ const culturalSchema = new Schema<ICultural>({
 }, { timestamps: true, strict: false });
 
 export const Cultural = mongoose.model<ICultural>('CulturalSchedule', culturalSchema);
+
+// --- Upcoming Event / Activity Poster Model ---
+export interface IUpcomingEvent extends Document {
+  id: string;
+  title: string;
+  eventDate: string; // YYYY-MM-DD
+  eventTime?: string; // e.g. "10:00" or "সকাল ১০:০০ টা"
+  dateTime?: Date;
+  location: string;
+  details: string;
+  image?: string;
+  chiefGuest?: string;
+  specialAttraction?: string;
+  isActive: boolean;
+  showPopup: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+const upcomingEventSchema = new Schema<IUpcomingEvent>({
+  id: { type: String, required: true, unique: true },
+  title: { type: String, required: true },
+  eventDate: { type: String, required: true },
+  eventTime: { type: String, default: 'সকাল ১০:০০ টা' },
+  dateTime: { type: Date },
+  location: { type: String, required: true },
+  details: { type: String, default: '' },
+  image: { type: String, default: '' },
+  chiefGuest: { type: String, default: '' },
+  specialAttraction: { type: String, default: '' },
+  isActive: { type: Boolean, default: true },
+  showPopup: { type: Boolean, default: true },
+}, { timestamps: true, strict: false });
+
+export const UpcomingEvent = mongoose.model<IUpcomingEvent>('UpcomingEvent', upcomingEventSchema);

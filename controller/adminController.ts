@@ -93,12 +93,32 @@ export const seedDemoData = async (req: Request, res: Response) => {
   res.json({ success: true, message: 'Demo data seeder disabled in Mongoose migration' });
 };
 
+import mongoose from 'mongoose';
+
+export const getMongoCollectionDocs = async (req: Request, res: Response) => {
+  try {
+    const { collectionName } = req.params;
+    const db = mongoose.connection.db;
+    if (!db) {
+      return res.status(500).json({ success: false, message: 'ডাটাবেজ সংযুক্ত নয়' });
+    }
+    const collection = db.collection(collectionName);
+    const documents = await collection.find({}).sort({ _id: -1 }).limit(100).toArray();
+    const count = await collection.countDocuments();
+    res.json({ success: true, collection: collectionName, count, documents });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 import { User } from '../model/userModel';
 import { Student } from '../model/studentModel';
+import { sendStudentApprovalEmail } from '../utils/emailService';
 
 export const approveRegistration = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const { cardImageData } = req.body;
     const student = await Student.findOne({ id });
     if (!student) return res.status(404).json({ success: false, message: 'শিক্ষার্থী পাওয়া যায়নি' });
 
@@ -140,9 +160,28 @@ export const approveRegistration = async (req: Request, res: Response) => {
     
     await finance.save();
 
-    console.log("message send success"); // User requested log
+    // Send confirmation email to student
+    let emailStatus = { success: false, message: 'ইমেইল দেওয়া হয়নি।' };
+    const targetEmail = student.email || user.email;
+    if (targetEmail && targetEmail.includes('@')) {
+      emailStatus = await sendStudentApprovalEmail({
+        to: targetEmail,
+        studentName: student.name || user.name,
+        batch: student.batch,
+        phone: student.phone || user.phone,
+        registrationFee: fee,
+        transactionId: student.transactionId || user.transactionId,
+        paymentMethod: (user as any).paymentMethod,
+        studentId: student.id,
+        cardImageData,
+      });
+    }
 
-    res.json({ success: true, message: 'রেজিস্ট্রেশন সফলভাবে অনুমোদন করা হয়েছে' });
+    res.json({
+      success: true,
+      message: `রেজিস্ট্রেশন সফলভাবে অনুমোদন করা হয়েছে। ${emailStatus.success ? 'শিক্ষার্থীর ইমেইলে নিশ্চিতকরণ পত্র পাঠানো হয়েছে ও লগ সেভ হয়েছে।' : 'ইমেইল পাঠানো সম্ভব হয়নি (লগে সংরক্ষিত)।'}`,
+      emailStatus,
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

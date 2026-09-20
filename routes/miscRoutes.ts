@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/authMiddleware';
 import { 
-  getDonors, createDonor, updateDonor, deleteDonor,
+  getDonors, createDonor, updateDonor, deleteDonor, submitPublicDonation, approveDonation,
   getGallery, createGallery, updateGallery, deleteGallery,
   getMagazine, createMagazine, updateMagazine, deleteMagazine
 } from '../controller/mediaController';
@@ -16,8 +16,10 @@ const router = Router();
 // Upload Route
 router.post('/upload', authenticateToken, requireAdmin, uploadImage);
 
-// Media Routes
+// Media Routes - Donations
 router.get('/donations', getDonors);
+router.post('/donations/submit', submitPublicDonation); // Public submission
+router.put('/donations/:id/approve', authenticateToken, requireAdmin, approveDonation); // Admin approve & send email
 router.post('/donations', authenticateToken, requireAdmin, createDonor);
 router.put('/donations/:id', authenticateToken, requireAdmin, updateDonor);
 router.delete('/donations/:id', authenticateToken, requireAdmin, deleteDonor);

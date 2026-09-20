@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Student } from '../model/studentModel';
 import { Stats } from '../model/configModel';
+import { User } from '../model/userModel';
 
 export const getStudents = async (req: Request, res: Response) => {
   try {
@@ -57,8 +58,22 @@ export const deleteStudent = async (req: Request, res: Response) => {
   try {
     const deleted = await Student.findOneAndDelete({ id: req.params.id });
     if (!deleted) return res.status(404).json({ success: false, message: 'পাওয়া যায়নি' });
+
+    // Also delete associated User account so email/phone are released immediately for re-registration
+    const orConditions: any[] = [];
+    if (deleted.email) orConditions.push({ email: deleted.email.toLowerCase() });
+    if (deleted.phone) orConditions.push({ phone: deleted.phone });
+    if (deleted.id) orConditions.push({ id: deleted.id });
+
+    if (orConditions.length > 0) {
+      await User.deleteMany({
+        role: { $ne: 'admin' },
+        $or: orConditions
+      });
+    }
+
     await Stats.updateOne({}, { $inc: { registeredStudents: -1 } });
-    res.json({ success: true, message: 'ডিলিট করা হয়েছে' });
+    res.json({ success: true, message: 'শিক্ষার্থী ও সংশ্লিষ্ট অ্যাকাউন্ট সফলভাবে মুছে ফেলা হয়েছে' });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

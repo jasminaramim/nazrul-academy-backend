@@ -6,7 +6,7 @@ import {
   getAdminInfo, updateAdminInfo,
   getFinance, updateFinance,
   getStats, updateStats,
-  getMongoConfig, updateMongoConfig, forceMongoSync, seedDemoData,
+  getMongoConfig, updateMongoConfig, forceMongoSync, seedDemoData, getMongoCollectionDocs,
   approveRegistration
 } from '../controller/adminController';
 
@@ -31,6 +31,7 @@ router.get('/system/mongo-config', getMongoConfig);
 router.post('/system/mongo-config', authenticateToken, requireAdmin, updateMongoConfig);
 router.post('/system/mongo-sync', authenticateToken, requireAdmin, forceMongoSync);
 router.post('/system/seed-demo-data', authenticateToken, requireAdmin, seedDemoData);
+router.get('/system/mongo-collections/:collectionName', authenticateToken, requireAdmin, getMongoCollectionDocs);
 
 router.put('/registrations/:id/approve', authenticateToken, requireAdmin, approveRegistration);
 

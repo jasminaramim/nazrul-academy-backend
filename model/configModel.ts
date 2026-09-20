@@ -11,14 +11,34 @@ export interface IGlobalConfig extends Document {
   feeNewBatch: number;
   maxRegistrations: number;
   bkashNumber: string;
+  bkashType: string;
+  bkashAction: string; // 'send_money' | 'cash_out' | 'payment'
+  bkashLimitOut: boolean;
   nagadNumber: string;
+  nagadType: string;
+  nagadAction: string;
+  nagadLimitOut: boolean;
   rocketNumber: string;
+  rocketType: string;
+  rocketAction: string;
+  rocketLimitOut: boolean;
+  bankName: string;
+  bankAccountName: string;
+  bankAccountNumber: string;
+  bankBranch: string;
+  bankRoutingNumber: string;
   contactPhone1: string;
   contactPhone2: string;
   contactEmail: string;
   address: string;
   facebookUrl: string;
   youtubeUrl: string;
+  cardBackgroundUrl: string;
+  cardTitle: string;
+  cardSubtitle1: string;
+  cardSubtitle2: string;
+  cardQuote: string;
+  cardFooterText: string;
 }
 const globalConfigSchema = new Schema<IGlobalConfig>({
   siteTitle: { type: String, default: 'ত্রিশাল সরকারি নজরুল একাডেমি' },
@@ -29,14 +49,34 @@ const globalConfigSchema = new Schema<IGlobalConfig>({
   feeNewBatch: { type: Number, default: 1000 },
   maxRegistrations: { type: Number, default: 8000 },
   bkashNumber: { type: String },
+  bkashType: { type: String, default: 'মার্চেন্ট' },
+  bkashAction: { type: String, default: 'payment' },
+  bkashLimitOut: { type: Boolean, default: false },
   nagadNumber: { type: String },
+  nagadType: { type: String, default: 'পার্সোনাল' },
+  nagadAction: { type: String, default: 'send_money' },
+  nagadLimitOut: { type: Boolean, default: false },
   rocketNumber: { type: String },
+  rocketType: { type: String, default: 'পার্সোনাল' },
+  rocketAction: { type: String, default: 'send_money' },
+  rocketLimitOut: { type: Boolean, default: false },
+  bankName: { type: String },
+  bankAccountName: { type: String },
+  bankAccountNumber: { type: String },
+  bankBranch: { type: String },
+  bankRoutingNumber: { type: String },
   contactPhone1: { type: String },
   contactPhone2: { type: String },
   contactEmail: { type: String },
   address: { type: String },
   facebookUrl: { type: String },
   youtubeUrl: { type: String },
+  cardBackgroundUrl: { type: String },
+  cardTitle: { type: String },
+  cardSubtitle1: { type: String },
+  cardSubtitle2: { type: String },
+  cardQuote: { type: String },
+  cardFooterText: { type: String },
 }, { timestamps: true, strict: false });
 export const GlobalConfig = mongoose.model<IGlobalConfig>('GlobalConfig', globalConfigSchema);
 

@@ -3,14 +3,36 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IDonor extends Document {
   id: string;
   name: string;
+  nameEn?: string;
   amount: number;
   batch?: string;
+  image?: string;
+  category?: string;
+  quote?: string;
+  phone?: string;
+  email?: string;
+  paymentMethod?: string;
+  senderNumber?: string;
+  transactionId?: string;
+  message?: string;
+  status?: 'pending' | 'approved' | 'rejected';
 }
 const donorSchema = new Schema<IDonor>({
   id: { type: String, required: true, unique: true },
   name: { type: String, required: true },
+  nameEn: { type: String },
   amount: { type: Number, required: true },
   batch: { type: String },
+  image: { type: String },
+  category: { type: String, default: 'সম্মানিত দাতা' },
+  quote: { type: String },
+  phone: { type: String },
+  email: { type: String },
+  paymentMethod: { type: String },
+  senderNumber: { type: String },
+  transactionId: { type: String },
+  message: { type: String },
+  status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
 }, { timestamps: true, strict: false });
 export const Donor = mongoose.model<IDonor>('Donor', donorSchema);
 
