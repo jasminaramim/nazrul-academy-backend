@@ -25,7 +25,7 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
 };
 
 export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (req.user && req.user.role === 'admin') {
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'super-admin')) {
     next();
   } else {
     res.status(403).json({ success: false, message: 'শুধুমাত্র অ্যাডমিনদের জন্য অনুমতি প্রাপ্ত' });

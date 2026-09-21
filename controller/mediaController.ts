@@ -212,14 +212,24 @@ export const deleteGallery = async (req: Request, res: Response) => {
 // --- Magazine ---
 export const getMagazine = async (req: Request, res: Response) => {
   try {
-    const data = await Magazine.find().sort({ createdAt: -1 });
+    const filter = req.query.all === 'true' ? {} : { isApproved: true };
+    const data = await Magazine.find(filter).sort({ createdAt: -1 });
     res.json({ success: true, data });
   } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
 };
 export const createMagazine = async (req: Request, res: Response) => {
   try {
     const { id, ...rest } = req.body;
-    const newItem = new Magazine({ id: 'mag-' + Date.now(), date: req.body.date || new Date().toISOString().split('T')[0], ...rest });
+    const newItem = new Magazine({ id: 'mag-' + Date.now(), date: req.body.date || new Date().toISOString().split('T')[0], isApproved: true, ...rest });
+    await newItem.save();
+    res.status(201).json({ success: true, data: newItem });
+  } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+export const submitMagazineArticle = async (req: Request, res: Response) => {
+  try {
+    const { id, ...rest } = req.body;
+    const newItem = new Magazine({ id: 'mag-' + Date.now(), date: req.body.date || new Date().toISOString().split('T')[0], isApproved: false, ...rest });
     await newItem.save();
     res.status(201).json({ success: true, data: newItem });
   } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }

@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { GlobalConfig, AdminInfo, Finance, Stats } from '../model/configModel';
+import { User } from '../model/userModel';
+import bcrypt from 'bcryptjs';
 
 // --- Global Config ---
 export const getGlobalConfig = async (req: Request, res: Response) => {
@@ -184,5 +186,105 @@ export const approveRegistration = async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// --- Admin Management ---
+
+export const getAdmins = async (req: any, res: Response) => {
+  try {
+    const admins = await User.find({ role: { $in: ['admin', 'super-admin'] } }).select('-passwordHash');
+    res.json({ success: true, data: admins });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'সমস্যা হয়েছে' });
+  }
+};
+
+export const createAdmin = async (req: any, res: Response) => {
+  try {
+    // Only super-admin can create new admins
+    if (req.user.role !== 'super-admin') {
+      return res.status(403).json({ success: false, message: 'শুধুমাত্র সুপার-অ্যাডমিন নতুন অ্যাডমিন তৈরি করতে পারবেন' });
+    }
+
+    const { name, username, email, password } = req.body;
+    if (!name || !username || !email || !password) {
+      return res.status(400).json({ success: false, message: 'সব তথ্য দিন' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const existing = await User.findOne({ $or: [{ email: normalizedEmail }, { username }] });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'এই ইমেইল বা ইউজারনেম ইতিমধ্যে ব্যবহৃত হচ্ছে' });
+    }
+
+    const newAdmin = new User({
+      id: 'adm-' + Date.now().toString(36),
+      name,
+      username,
+      email: normalizedEmail,
+      passwordHash: bcrypt.hashSync(password, 10),
+      role: 'admin',
+      status: 'approved'
+    });
+
+    await newAdmin.save();
+    const adminObj = newAdmin.toObject();
+    delete adminObj.passwordHash;
+
+    res.json({ success: true, message: 'নতুন অ্যাডমিন তৈরি করা হয়েছে', data: adminObj });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'সমস্যা হয়েছে' });
+  }
+};
+
+export const deleteAdmin = async (req: any, res: Response) => {
+  try {
+    if (req.user.role !== 'super-admin') {
+      return res.status(403).json({ success: false, message: 'শুধুমাত্র সুপার-অ্যাডমিন অন্য অ্যাডমিন ডিলিট করতে পারবেন' });
+    }
+
+    const { id } = req.params;
+    const targetAdmin = await User.findOne({ id });
+
+    if (!targetAdmin) return res.status(404).json({ success: false, message: 'অ্যাডমিন পাওয়া যায়নি' });
+    if (targetAdmin.role === 'super-admin') return res.status(400).json({ success: false, message: 'সুপার-অ্যাডমিন অ্যাকাউন্ট ডিলিট করা সম্ভব নয়' });
+    if (targetAdmin.id === req.user.id) return res.status(400).json({ success: false, message: 'নিজের অ্যাকাউন্ট ডিলিট করা সম্ভব নয়' });
+
+    await User.deleteOne({ id });
+    res.json({ success: true, message: 'অ্যাডমিন অ্যাকাউন্ট রিমুভ করা হয়েছে' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'সমস্যা হয়েছে' });
+  }
+};
+
+export const transferSuperAdmin = async (req: any, res: Response) => {
+  try {
+    if (req.user.role !== 'super-admin') {
+      return res.status(403).json({ success: false, message: 'শুধুমাত্র বর্তমান সুপার-অ্যাডমিন এই কাজটি করতে পারবেন' });
+    }
+
+    const { targetId } = req.body;
+    if (!targetId || targetId === req.user.id) {
+      return res.status(400).json({ success: false, message: 'সঠিক অ্যাডমিন আইডি দিন' });
+    }
+
+    const targetAdmin = await User.findOne({ id: targetId });
+    if (!targetAdmin || targetAdmin.role !== 'admin') {
+      return res.status(404).json({ success: false, message: 'কাঙ্ক্ষিত অ্যাডমিন পাওয়া যায়নি' });
+    }
+
+    const currentSuperAdmin = await User.findOne({ id: req.user.id });
+    if (!currentSuperAdmin) return res.status(404).json({ success: false, message: 'আপনার অ্যাকাউন্ট পাওয়া যায়নি' });
+
+    // Swap roles
+    currentSuperAdmin.role = 'admin';
+    targetAdmin.role = 'super-admin';
+
+    await Promise.all([currentSuperAdmin.save(), targetAdmin.save()]);
+
+    res.json({ success: true, message: 'সুপার-অ্যাডমিন ভূমিকা সফলভাবে স্থানান্তর করা হয়েছে' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'সমস্যা হয়েছে' });
   }
 };

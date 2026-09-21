@@ -3,7 +3,7 @@ import { authenticateToken, requireAdmin } from '../middleware/authMiddleware';
 import { 
   getDonors, createDonor, updateDonor, deleteDonor, submitPublicDonation, approveDonation,
   getGallery, createGallery, updateGallery, deleteGallery,
-  getMagazine, createMagazine, updateMagazine, deleteMagazine
+  getMagazine, createMagazine, updateMagazine, deleteMagazine, submitMagazineArticle
 } from '../controller/mediaController';
 import {
   getHeroSlides, createHeroSlide, updateHeroSlide, deleteHeroSlide,
@@ -30,6 +30,7 @@ router.put('/gallery/:id', authenticateToken, requireAdmin, updateGallery);
 router.delete('/gallery/:id', authenticateToken, requireAdmin, deleteGallery);
 
 router.get('/magazine', getMagazine);
+router.post('/magazine/submit', submitMagazineArticle);
 router.post('/magazine', authenticateToken, requireAdmin, createMagazine);
 router.put('/magazine/:id', authenticateToken, requireAdmin, updateMagazine);
 router.delete('/magazine/:id', authenticateToken, requireAdmin, deleteMagazine);

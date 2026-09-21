@@ -56,10 +56,13 @@ export interface IMagazine extends Document {
   id: string;
   title: string;
   author: string;
+  authorBatch?: string;
+  contactPhone?: string;
   type: string;
   excerpt?: string;
   content: string;
   date?: string;
+  isApproved: boolean;
 }
 const magazineSchema = new Schema<IMagazine>({
   id: { type: String, required: true, unique: true },
@@ -69,6 +72,9 @@ const magazineSchema = new Schema<IMagazine>({
   excerpt: { type: String },
   content: { type: String, required: true },
   date: { type: String },
+  authorBatch: { type: String },
+  contactPhone: { type: String },
+  isApproved: { type: Boolean, default: false },
 }, { timestamps: true, strict: false });
 export const Magazine = mongoose.model<IMagazine>('Magazine', magazineSchema);
 

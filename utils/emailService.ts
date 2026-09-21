@@ -23,6 +23,12 @@ interface StudentApprovalEmailParams {
   cardImageData?: string;
 }
 
+interface OtpEmailParams {
+  to: string;
+  otp: string;
+  purpose: 'registration' | 'password_reset';
+}
+
 // Create reusable transporter object using SMTP transport or fallback
 function getTransporter() {
   const host = process.env.SMTP_HOST;
@@ -98,6 +104,51 @@ export async function recordEmailLog({
   }
 }
 
+// 0. Send OTP Email
+export async function sendOTPEmail({ to, otp, purpose }: OtpEmailParams): Promise<{ success: boolean; message: string; logId?: string }> {
+  const subject = purpose === 'password_reset' 
+    ? 'নজরুল একাডেমী অ্যালামনাই - পাসওয়ার্ড রিসেট ওটিপি (OTP)'
+    : 'নজরুল একাডেমী অ্যালামনাই - ইমেইল ভেরিফিকেশন কোড';
+    
+  const htmlContent = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0;">
+      <div style="background: linear-gradient(135deg, #00732A 0%, #005c21 60%, #0f172a 100%); padding: 30px 24px; text-align: center; color: #ffffff;">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 800;">নজরুল একাডেমি অ্যালামনাই</h1>
+      </div>
+      <div style="padding: 28px 24px; color: #1e293b; text-align: center;">
+        <h2 style="font-size: 20px; color: #00732A; font-weight: 700;">আপনার ওটিপি (OTP) কোড</h2>
+        <p style="font-size: 15px; color: #64748b; margin-bottom: 24px;">দয়া করে নিচের ৬-ডিজিটের কোডটি ব্যবহার করুন:</p>
+        <div style="background-color: #f1f5f9; border-radius: 12px; padding: 20px; font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #0f172a; display: inline-block;">
+          ${otp}
+        </div>
+        <p style="font-size: 13px; color: #94a3b8; margin-top: 24px;">কোডটি আগামী ১০ মিনিট পর্যন্ত কার্যকর থাকবে। আপনি যদি এই অনুরোধ না করে থাকেন, তবে এটি এড়িয়ে যান।</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    if (!to || !to.includes('@')) {
+      return { success: false, message: 'সঠিক ইমেইল দিন' };
+    }
+    const transporter = getTransporter();
+    if (!transporter) {
+      console.log(`[Email Mock] OTP for ${to}: ${otp}`);
+      return { success: true, message: 'মক সার্ভিস: ওটিপি কনসোলে প্রিন্ট করা হয়েছে।' };
+    }
+
+    await transporter.sendMail({
+      from: `"ত্রিশাল নজরুল একাডেমি" <${process.env.SMTP_USER || process.env.EMAIL_USER || 'no-reply@trishalnazrulacademy.edu.bd'}>`,
+      to,
+      subject,
+      html: htmlContent,
+    });
+    return { success: true, message: 'ওটিপি পাঠানো হয়েছে।' };
+  } catch (error: any) {
+    console.error('Failed to send OTP email:', error);
+    return { success: false, message: 'ইমেইল পাঠানো সম্ভব হয়নি।' };
+  }
+}
+
 // 1. Send Donation Approval Email
 export async function sendDonationApprovalEmail({
   to,
@@ -108,7 +159,7 @@ export async function sendDonationApprovalEmail({
   batch,
   donorId,
 }: DonationApprovalEmailParams): Promise<{ success: boolean; message: string; logId?: string }> {
-  const subject = 'ত্রিশাল সরকারি নজরুল একাডেমি - আপনার অনুদান সফলভাবে অনুমোদিত হয়েছে 🎉';
+  const subject = 'নজরুল একাডেমী  অ্যালামনাই - আপনার অনুদান সফলভাবে অনুমোদিত হয়েছে 🎉';
   const formattedAmount = Number(amount).toLocaleString('bn-BD');
   const methodLabel =
     paymentMethod === 'bkash'
@@ -125,7 +176,7 @@ export async function sendDonationApprovalEmail({
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
       <!-- Header -->
       <div style="background: linear-gradient(135deg, #00732A 0%, #005c21 60%, #CA0000 100%); padding: 30px 24px; text-align: center; color: #ffffff;">
-        <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">ত্রিশাল সরকারি নজরুল একাডেমি</h1>
+        <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">নজরুল একাডেমি অ্যালামনাই অ্যাসোসিয়েশন</h1>
         <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">প্রাক্তন ছাত্র-ছাত্রী অ্যালামনাই অ্যাসোসিয়েশন ও পুনর্মিলনী উৎসব ২০২৬</p>
       </div>
 
@@ -280,14 +331,14 @@ export async function sendStudentApprovalEmail({
   studentId,
   cardImageData,
 }: StudentApprovalEmailParams): Promise<{ success: boolean; message: string; logId?: string }> {
-  const subject = 'ত্রিশাল সরকারি নজরুল একাডেমি - আপনার রেজিস্ট্রেশন সফলভাবে অনুমোদিত হয়েছে 🎓';
+  const subject = 'নজরুল একাডেমী  অ্যালামনাই - আপনার রেজিস্ট্রেশন সফলভাবে অনুমোদিত হয়েছে 🏫';
   const formattedFee = registrationFee ? Number(registrationFee).toLocaleString('bn-BD') : '০';
 
   const htmlContent = `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
       <!-- Header -->
       <div style="background: linear-gradient(135deg, #00732A 0%, #005c21 60%, #0f172a 100%); padding: 30px 24px; text-align: center; color: #ffffff;">
-        <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">ত্রিশাল সরকারি নজরুল একাডেমি</h1>
+        <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">নজরুল একাডেমি অ্যালামনাই অ্যাসোসিয়েশন</h1>
         <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">ঐতিহাসিক শতবর্ষ পূর্তি ও মহা পুনর্মিলনী উৎসব ২০২৬</p>
       </div>
 
@@ -303,7 +354,7 @@ export async function sendStudentApprovalEmail({
 
         <p style="font-size: 15px; line-height: 1.6; margin: 0 0 16px;">
           প্রিয় শিক্ষার্থী <strong>${studentName}</strong> (এসএসসি ব্যাচ: <strong>${batch}</strong>),<br/>
-          ত্রিশাল সরকারি নজরুল একাডেমি অ্যালামনাই অ্যাসোসিয়েশন পরিবারের পক্ষ থেকে আপনাকে আন্তরিক মোবারকবাদ। আপনার নিবন্ধন ও পেমেন্ট তথ্য যাচাইপূর্বক অ্যাডমিন কর্তৃক অনুমোদন দেওয়া হয়েছে।
+          নজরুল একাডেমি অ্যালামনাই অ্যাসোসিয়েশন পরিবারের পক্ষ থেকে আপনাকে আন্তরিক মোবারকবাদ। আপনার নিবন্ধন ও পেমেন্ট তথ্য যাচাইপূর্বক অ্যাডমিন কর্তৃক অনুমোদন দেওয়া হয়েছে।
         </p>
 
         <!-- Registration Details Table -->

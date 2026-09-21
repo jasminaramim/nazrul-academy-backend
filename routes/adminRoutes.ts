@@ -7,7 +7,8 @@ import {
   getFinance, updateFinance,
   getStats, updateStats,
   getMongoConfig, updateMongoConfig, forceMongoSync, seedDemoData, getMongoCollectionDocs,
-  approveRegistration
+  approveRegistration,
+  getAdmins, createAdmin, deleteAdmin, transferSuperAdmin
 } from '../controller/adminController';
 
 const router = Router();
@@ -34,5 +35,11 @@ router.post('/system/seed-demo-data', authenticateToken, requireAdmin, seedDemoD
 router.get('/system/mongo-collections/:collectionName', authenticateToken, requireAdmin, getMongoCollectionDocs);
 
 router.put('/registrations/:id/approve', authenticateToken, requireAdmin, approveRegistration);
+
+// --- Admin Management ---
+router.get('/admins', authenticateToken, requireAdmin, getAdmins);
+router.post('/admins', authenticateToken, requireAdmin, createAdmin);
+router.delete('/admins/:id', authenticateToken, requireAdmin, deleteAdmin);
+router.put('/transfer', authenticateToken, requireAdmin, transferSuperAdmin);
 
 export default router;

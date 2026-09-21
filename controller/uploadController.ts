@@ -17,14 +17,14 @@ export const uploadImage = async (req: Request, res: Response) => {
     }
 
     // Check if it's a base64 string
-    if (!image.startsWith('data:image')) {
-      return res.status(400).json({ success: false, message: 'ইমেজটি সঠিক ফরম্যাটে নেই (Base64 প্রয়োজন)' });
+    if (!image.startsWith('data:image') && !image.startsWith('data:video') && !image.startsWith('data:application/pdf')) {
+      return res.status(400).json({ success: false, message: 'ফাইলটি সঠিক ফরম্যাটে নেই (Base64 প্রয়োজন)' });
     }
 
     // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(image, {
       folder: 'trishal_academy',
-      resource_type: 'image',
+      resource_type: 'auto',
     });
 
     res.json({ success: true, url: result.secure_url });
