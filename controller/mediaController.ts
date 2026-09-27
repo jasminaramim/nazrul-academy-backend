@@ -41,17 +41,20 @@ export const submitPublicDonation = async (req: Request, res: Response) => {
     // Verify payment method limit status
     const config = await GlobalConfig.findOne();
     if (config) {
-      const method = (paymentMethod || 'bkash').toLowerCase();
-      if (
-        (method === 'bkash' && config.bkashLimitOut) ||
-        (method === 'nagad' && config.nagadLimitOut) ||
-        (method === 'rocket' && config.rocketLimitOut)
-      ) {
+      const fullMethod = (paymentMethod || 'bkash').toLowerCase();
+      const [method, idxStr] = fullMethod.split('-');
+      const idx = parseInt(idxStr) || 0;
+      const isOut = 
+        (method === 'bkash' && config.bkashAccounts && config.bkashAccounts[idx]?.isLimitOut) ||
+        (method === 'nagad' && config.nagadAccounts && config.nagadAccounts[idx]?.isLimitOut) ||
+        (method === 'rocket' && config.rocketAccounts && config.rocketAccounts[idx]?.isLimitOut);
+      
+      if (isOut) {
         const methodBn = method === 'bkash' ? 'বিকাশ' : method === 'nagad' ? 'নগদ' : 'রকেট';
         return res.status(400).json({
           success: false,
           isLimitOut: true,
-          limitMethod: method,
+          limitMethod: fullMethod,
           message: `বর্তমানে আমাদের ${methodBn} অ্যাকাউন্টের লেনদেনের সীমা (Limit) শেষ। অনুগ্রহ করে অন্য কোনো মাধ্যমে পেমেন্ট করুন।`,
         });
       }

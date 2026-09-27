@@ -10,18 +10,9 @@ export interface IGlobalConfig extends Document {
   feeOldBatch: number;
   feeNewBatch: number;
   maxRegistrations: number;
-  bkashNumber: string;
-  bkashType: string;
-  bkashAction: string; // 'send_money' | 'cash_out' | 'payment'
-  bkashLimitOut: boolean;
-  nagadNumber: string;
-  nagadType: string;
-  nagadAction: string;
-  nagadLimitOut: boolean;
-  rocketNumber: string;
-  rocketType: string;
-  rocketAction: string;
-  rocketLimitOut: boolean;
+  bkashAccounts: any[];
+  nagadAccounts: any[];
+  rocketAccounts: any[];
   bankName: string;
   bankAccountName: string;
   bankAccountNumber: string;
@@ -48,18 +39,9 @@ const globalConfigSchema = new Schema<IGlobalConfig>({
   feeOldBatch: { type: Number, default: 1500 },
   feeNewBatch: { type: Number, default: 1000 },
   maxRegistrations: { type: Number, default: 8000 },
-  bkashNumber: { type: String },
-  bkashType: { type: String, default: 'মার্চেন্ট' },
-  bkashAction: { type: String, default: 'payment' },
-  bkashLimitOut: { type: Boolean, default: false },
-  nagadNumber: { type: String },
-  nagadType: { type: String, default: 'পার্সোনাল' },
-  nagadAction: { type: String, default: 'send_money' },
-  nagadLimitOut: { type: Boolean, default: false },
-  rocketNumber: { type: String },
-  rocketType: { type: String, default: 'পার্সোনাল' },
-  rocketAction: { type: String, default: 'send_money' },
-  rocketLimitOut: { type: Boolean, default: false },
+  bkashAccounts: { type: [], default: [] },
+  nagadAccounts: { type: [], default: [] },
+  rocketAccounts: { type: [], default: [] },
   bankName: { type: String },
   bankAccountName: { type: String },
   bankAccountNumber: { type: String },

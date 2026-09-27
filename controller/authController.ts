@@ -250,17 +250,20 @@ export const register = async (req: Request, res: Response) => {
        return res.status(400).json({ success: false, message: 'রেজিস্ট্রেশন কোটা পূর্ণ হয়ে গেছে। আর নতুন রেজিস্ট্রেশন সম্ভব নয়।' });
     }
 
-    const method = (paymentMethod || 'bkash').toLowerCase();
-    if (
-      (method === 'bkash' && config.bkashLimitOut) ||
-      (method === 'nagad' && config.nagadLimitOut) ||
-      (method === 'rocket' && config.rocketLimitOut)
-    ) {
+    const fullMethod = (paymentMethod || 'bkash').toLowerCase();
+    const [method, idxStr] = fullMethod.split('-');
+    const idx = parseInt(idxStr) || 0;
+    const isOut = 
+      (method === 'bkash' && config.bkashAccounts && config.bkashAccounts[idx]?.isLimitOut) ||
+      (method === 'nagad' && config.nagadAccounts && config.nagadAccounts[idx]?.isLimitOut) ||
+      (method === 'rocket' && config.rocketAccounts && config.rocketAccounts[idx]?.isLimitOut);
+
+    if (isOut) {
       const methodBn = method === 'bkash' ? 'বিকাশ' : method === 'nagad' ? 'নগদ' : 'রকেট';
       return res.status(400).json({
         success: false,
         isLimitOut: true,
-        limitMethod: method,
+        limitMethod: fullMethod,
         message: `বর্তমানে আমাদের ${methodBn} অ্যাকাউন্টের লেনদেনের সীমা (Limit) শেষ। অনুগ্রহ করে অন্য মাধ্যমে ফি পরিশোধ করুন।`,
       });
     }

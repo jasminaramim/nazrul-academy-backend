@@ -113,7 +113,7 @@ export const getMongoCollectionDocs = async (req: Request, res: Response) => {
   }
 };
 
-import { User } from '../model/userModel';
+
 import { Student } from '../model/studentModel';
 import { sendStudentApprovalEmail } from '../utils/emailService';
 
