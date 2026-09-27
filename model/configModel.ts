@@ -24,6 +24,7 @@ export interface IGlobalConfig extends Document {
   address: string;
   facebookUrl: string;
   youtubeUrl: string;
+  cardLogoUrl: string;
   cardBackgroundUrl: string;
   cardTitle: string;
   cardSubtitle1: string;
@@ -53,6 +54,7 @@ const globalConfigSchema = new Schema<IGlobalConfig>({
   address: { type: String },
   facebookUrl: { type: String },
   youtubeUrl: { type: String },
+  cardLogoUrl: { type: String },
   cardBackgroundUrl: { type: String },
   cardTitle: { type: String },
   cardSubtitle1: { type: String },
