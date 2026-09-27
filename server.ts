@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import mongoSanitize from 'express-mongo-sanitize';
 import routes from './routes/index';
 import { connectDB } from './config/dbConfig';
 
@@ -10,6 +12,10 @@ dotenv.config();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;
 
 const app = express();
+
+// Security Middlewares
+app.use(helmet()); // Adds security headers
+app.use(mongoSanitize()); // Prevents NoSQL Injection
 
 // CORS
 const allowedOrigins = [
