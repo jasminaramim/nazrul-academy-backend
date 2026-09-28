@@ -83,8 +83,9 @@ export const resetPassword = async (req: Request, res: Response) => {
     const user = await User.findOne({ email: normalizedEmail, role: { $in: ['admin', 'super-admin'] } });
     if (!user) return res.status(404).json({ success: false, message: 'ইউজার পাওয়া যায়নি' });
 
-    user.passwordHash = bcrypt.hashSync(newPassword, 10);
-    await user.save();
+    const newHash = bcrypt.hashSync(newPassword, 10);
+    await User.updateOne({ email: normalizedEmail, role: { $in: ['admin', 'super-admin'] } }, { passwordHash: newHash });
+    
     delete verificationCodes[normalizedEmail];
 
     res.json({ success: true, message: 'পাসওয়ার্ড পরিবর্তন সফল হয়েছে' });
@@ -109,11 +110,12 @@ export const changePassword = async (req: any, res: Response) => {
 
     if (!isMatch && !usingFallback) return res.status(401).json({ success: false, message: 'বর্তমান পাসওয়ার্ড ভুল' });
 
-    user.passwordHash = bcrypt.hashSync(newPassword, 10);
-    await user.save();
+    const newHash = bcrypt.hashSync(newPassword, 10);
+    await User.updateOne({ id: req.user.id }, { passwordHash: newHash });
 
     res.json({ success: true, message: 'পাসওয়ার্ড পরিবর্তন সফল হয়েছে' });
   } catch (err) {
+    console.error("Change Password Error:", err);
     res.status(500).json({ success: false, message: 'সমস্যা হয়েছে' });
   }
 };
@@ -134,8 +136,7 @@ export const changeEmail = async (req: any, res: Response) => {
     const user = await User.findOne({ id: req.user.id });
     if (!user) return res.status(404).json({ success: false, message: 'ইউজার পাওয়া যায়নি' });
 
-    user.email = normalizedEmail;
-    await user.save();
+    await User.updateOne({ id: req.user.id }, { email: normalizedEmail });
 
     res.json({ success: true, message: 'ইমেইল পরিবর্তন সফল হয়েছে' });
   } catch (err) {
