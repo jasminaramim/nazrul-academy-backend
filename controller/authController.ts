@@ -383,3 +383,39 @@ export const checkApplicationStatus = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'সার্ভার সমস্যা দেখা দিয়েছে।' });
   }
 };
+
+export const changeName = async (req: any, res: Response) => {
+  try {
+    const { newName } = req.body;
+    if (!newName) return res.status(400).json({ success: false, message: 'নতুন নাম প্রদান করুন' });
+
+    const mongoose = require('mongoose');
+    const querySelf = mongoose.isValidObjectId(req.user.id) ? { $or: [{ id: req.user.id }, { _id: req.user.id }] } : { id: req.user.id };
+    const user = await User.findOne(querySelf);
+    if (!user) return res.status(404).json({ success: false, message: 'অ্যাকাউন্ট পাওয়া যায়নি' });
+
+    await User.updateOne(querySelf, { $set: { name: newName } });
+    res.json({ success: true, message: 'নাম সফলভাবে পরিবর্তন করা হয়েছে' });
+  } catch (err: any) {
+    console.error('changeName error:', err);
+    res.status(500).json({ success: false, message: 'সার্ভার সমস্যা: ' + err.message });
+  }
+};
+
+export const tempFixRoles = async (req: any, res: Response) => {
+  try {
+    const admins = await User.find({ role: { $in: ['admin', 'super-admin', 'super_admin'] } });
+    for (const admin of admins) {
+      if (admin.name && admin.name.includes('Jasmin')) {
+        const newRole = admin.role === 'super_admin' ? 'super-admin' : admin.role;
+        await User.updateOne({ _id: admin._id }, { $set: { name: '(প্রধান প্রশাসক)', role: newRole } });
+      }
+      if ((admin.name && admin.name.includes('Rofikul')) || admin.username === 'rofikul6424') {
+        await User.updateOne({ _id: admin._id }, { $set: { role: 'admin' } });
+      }
+    }
+    res.json({ success: true, message: 'Roles fixed successfully.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

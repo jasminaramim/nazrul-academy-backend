@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { GlobalConfig, AdminInfo, Finance, Stats } from '../model/configModel';
 import { User } from '../model/userModel';
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
 
 // --- Global Config ---
 export const getGlobalConfig = async (req: Request, res: Response) => {
@@ -95,7 +96,6 @@ export const seedDemoData = async (req: Request, res: Response) => {
   res.json({ success: true, message: 'Demo data seeder disabled in Mongoose migration' });
 };
 
-import mongoose from 'mongoose';
 
 export const getMongoCollectionDocs = async (req: Request, res: Response) => {
   try {
@@ -260,7 +260,7 @@ export const deleteAdmin = async (req: any, res: Response) => {
 
 export const transferSuperAdmin = async (req: any, res: Response) => {
   try {
-    if (req.user.role !== 'super-admin') {
+    if (req.user.role !== 'super-admin' && req.user.role !== 'super_admin') {
       return res.status(403).json({ success: false, message: 'শুধুমাত্র বর্তমান সুপার-অ্যাডমিন এই কাজটি করতে পারবেন' });
     }
 
@@ -269,19 +269,21 @@ export const transferSuperAdmin = async (req: any, res: Response) => {
       return res.status(400).json({ success: false, message: 'সঠিক অ্যাডমিন আইডি দিন' });
     }
 
-    const targetAdmin = await User.findOne({ id: targetId });
-    if (!targetAdmin || targetAdmin.role !== 'admin') {
-      return res.status(404).json({ success: false, message: 'কাঙ্ক্ষিত অ্যাডমিন পাওয়া যায়নি' });
+    const queryTarget = mongoose.isValidObjectId(targetId) ? { $or: [{ id: targetId }, { _id: targetId }] } : { id: targetId };
+    const targetAdmin = await User.findOne(queryTarget);
+    if (!targetAdmin || (targetAdmin.role === 'super-admin' || targetAdmin.role === 'super_admin')) {
+      return res.status(404).json({ success: false, message: 'কাঙ্ক্ষিত অ্যাডমিন পাওয়া যায়নি বা উনি ইতোমধ্যে সুপার-অ্যাডমিন' });
     }
 
-    const currentSuperAdmin = await User.findOne({ id: req.user.id });
+    const querySelf = mongoose.isValidObjectId(req.user.id) ? { $or: [{ id: req.user.id }, { _id: req.user.id }] } : { id: req.user.id };
+    const currentSuperAdmin = await User.findOne(querySelf);
     if (!currentSuperAdmin) return res.status(404).json({ success: false, message: 'আপনার অ্যাকাউন্ট পাওয়া যায়নি' });
 
     // Swap roles
-    currentSuperAdmin.role = 'admin';
-    targetAdmin.role = 'super-admin';
-
-    await Promise.all([currentSuperAdmin.save(), targetAdmin.save()]);
+    await Promise.all([
+      User.updateOne(querySelf, { $set: { role: 'admin' } }),
+      User.updateOne(queryTarget, { $set: { role: 'super-admin' } })
+    ]);
 
     res.json({ success: true, message: 'সুপার-অ্যাডমিন ভূমিকা সফলভাবে স্থানান্তর করা হয়েছে' });
   } catch (err: any) {
