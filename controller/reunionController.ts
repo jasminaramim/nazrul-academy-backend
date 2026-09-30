@@ -56,3 +56,24 @@ export const updateReunion = async (req: Request, res: Response) => {
     res.status(400).json({ error: error.message });
   }
 };
+
+export const deleteReunion = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if it's the active one
+    const reunion = await Reunion.findOne({ id });
+    if (!reunion) {
+      return res.status(404).json({ error: 'Reunion not found' });
+    }
+    
+    if (reunion.isActive) {
+      return res.status(400).json({ error: 'Cannot delete the active reunion event.' });
+    }
+
+    await Reunion.findOneAndDelete({ id });
+    res.json({ message: 'Reunion deleted successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
