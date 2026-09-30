@@ -52,17 +52,174 @@ export const updateAdminInfo = async (req: Request, res: Response) => {
 // --- Finance ---
 export const getFinance = async (req: Request, res: Response) => {
   try {
-    let finance = await Finance.findOne();
-    if (!finance) finance = await Finance.create({});
-    res.json({ success: true, data: finance });
+    const { reunionId } = req.query;
+    let query: any = {};
+    if (reunionId) {
+      query.reunionId = reunionId;
+    } else {
+      const activeReunion = await mongoose.model('Reunion').findOne({ isActive: true });
+      if (activeReunion) {
+        query.reunionId = activeReunion.id;
+      }
+    }
+
+    let finance: any = await Finance.findOne(query);
+    if (!finance) finance = await Finance.create(query);
+    finance = finance.toObject();
+
+    // Auto-fix old data if necessary
+    const Student = mongoose.model('Student');
+    const Donor = mongoose.model('Donor');
+    const unassignedStudents = await Student.countDocuments({ $or: [{ reunionId: { $exists: false } }, { reunionId: null }, { reunionId: '' }] });
+    if (unassignedStudents > 0) {
+      const oldestReunion = await mongoose.model('Reunion').findOne().sort({ year: 1 });
+      if (oldestReunion) {
+        await Student.updateMany({ $or: [{ reunionId: { $exists: false } }, { reunionId: null }, { reunionId: '' }] }, { $set: { reunionId: oldestReunion.id } });
+        await Donor.updateMany({ $or: [{ reunionId: { $exists: false } }, { reunionId: null }, { reunionId: '' }] }, { $set: { reunionId: oldestReunion.id } });
+      }
+    }
+
+    // Calculate student fees
+    let studentMatchQuery: any = { status: 'approved' };
+    if (query.reunionId) {
+      studentMatchQuery.reunionId = query.reunionId;
+    }
+    
+    const studentAgg = await Student.aggregate([
+      { $match: studentMatchQuery },
+      { $group: { _id: null, total: { $sum: { $convert: { input: "$registrationFee", to: "double", onError: 0, onNull: 0 } } } } }
+    ]);
+    const totalStudentIncome = studentAgg[0] ? studentAgg[0].total : 0;
+
+    // Calculate global donations from donors
+    const donorAgg = await Donor.aggregate([
+      { $match: { status: 'approved' } }, // Force global donation
+      { $group: { _id: null, total: { $sum: { $convert: { input: "$amount", to: "double", onError: 0, onNull: 0 } } } } }
+    ]);
+    const totalDonations = donorAgg[0] ? donorAgg[0].total : 0;
+
+    // Calculate global manual donations across all events
+    const allFinances = await Finance.find({});
+    let globalManualDonationIncome = 0;
+    let globalDonationExpense = 0;
+    
+    allFinances.forEach((f: any) => {
+      if (f.transactions && Array.isArray(f.transactions)) {
+        f.transactions.forEach((t: any) => {
+          if (t.type === 'income' && t.fundSource === 'donation') globalManualDonationIncome += (Number(t.amount) || 0);
+          if (t.type === 'expense' && t.fundSource === 'donation') globalDonationExpense += (Number(t.amount) || 0);
+        });
+      }
+    });
+
+    const globalDonationFund = totalDonations + globalManualDonationIncome - globalDonationExpense;
+    const globalTotalDonationIncome = totalDonations + globalManualDonationIncome;
+
+    // Calculate transaction sums for CURRENT EVENT
+    let manualIncome = 0;
+    let manualExpense = 0;
+    if (finance.transactions && Array.isArray(finance.transactions)) {
+      finance.transactions.forEach((t: any) => {
+        if (t.type === 'income' && t.source !== 'Registration' && t.source !== 'Donation') manualIncome += (Number(t.amount) || 0);
+        if (t.type === 'expense') manualExpense += (Number(t.amount) || 0);
+      });
+    }
+
+    finance.totalIncome = manualIncome + totalStudentIncome;
+    finance.totalExpense = manualExpense;
+    finance.balance = finance.totalIncome - finance.totalExpense;
+
+    // Update the breakdown explicitly
+    finance.breakdown = {
+      ...((!Array.isArray(finance.breakdown) && finance.breakdown) || {}),
+      registrationFees: totalStudentIncome,
+      donations: totalDonations
+    };
+
+    // Return finance as object and attach globalDonationFund
+    res.json({ 
+      success: true, 
+      data: {
+        ...(typeof finance.toObject === 'function' ? finance.toObject() : finance),
+        globalDonationFund,
+        globalTotalDonationIncome
+      } 
+    });
+  } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+export const getGlobalFinance = async (req: Request, res: Response) => {
+  try {
+    const Student = mongoose.model('Student');
+    const studentAgg = await Student.aggregate([
+      { $match: { status: 'approved' } },
+      { $group: { _id: null, total: { $sum: { $convert: { input: "$registrationFee", to: "double", onError: 0, onNull: 0 } } } } }
+    ]);
+    const totalRegistrationIncome = studentAgg[0] ? studentAgg[0].total : 0;
+
+    const Donor = mongoose.model('Donor');
+    const donorAgg = await Donor.aggregate([
+      { $match: { status: 'approved' } },
+      { $group: { _id: null, total: { $sum: { $convert: { input: "$amount", to: "double", onError: 0, onNull: 0 } } } } }
+    ]);
+    const totalDonationIncome = donorAgg[0] ? donorAgg[0].total : 0;
+
+    const finances = await Finance.find({});
+    let totalManualIncome = 0;
+    let totalManualExpense = 0;
+    let globalManualDonationIncome = 0;
+    let globalDonationExpense = 0;
+    
+    finances.forEach((f: any) => {
+      if (f.transactions && Array.isArray(f.transactions)) {
+        f.transactions.forEach((t: any) => {
+          if (t.type === 'income') {
+            if (t.fundSource === 'donation') globalManualDonationIncome += (Number(t.amount) || 0);
+            if (t.source !== 'Registration' && t.source !== 'Donation') totalManualIncome += (Number(t.amount) || 0);
+          }
+          if (t.type === 'expense') {
+            if (t.fundSource === 'donation') globalDonationExpense += (Number(t.amount) || 0);
+            totalManualExpense += (Number(t.amount) || 0);
+          }
+        });
+      }
+    });
+
+    const globalDonationFund = totalDonationIncome + globalManualDonationIncome - globalDonationExpense;
+
+    const grandTotalIncome = totalRegistrationIncome + totalDonationIncome + totalManualIncome;
+    const grandTotalExpense = totalManualExpense;
+    const grandBalance = grandTotalIncome - grandTotalExpense;
+
+    res.json({
+      success: true,
+      data: {
+        totalRegistrationIncome,
+        totalDonationIncome,
+        totalManualIncome,
+        totalManualExpense,
+        grandTotalIncome,
+        grandTotalExpense,
+        grandBalance,
+        globalDonationFund,
+        globalTotalDonationIncome
+      }
+    });
   } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
 };
 export const updateFinance = async (req: Request, res: Response) => {
   try {
-    const { totalIncome, totalExpense, breakdown, transactions } = req.body;
+    const { totalIncome, totalExpense, breakdown, transactions, reunionId } = req.body;
+    let query: any = {};
+    if (reunionId) query.reunionId = reunionId;
+    else {
+      const activeReunion = await mongoose.model('Reunion').findOne({ isActive: true });
+      if (activeReunion) query.reunionId = activeReunion.id;
+    }
+
     const balance = (Number(totalIncome) || 0) - (Number(totalExpense) || 0);
-    const updateData = { totalIncome, totalExpense, balance, breakdown, transactions, lastUpdated: new Date().toISOString().split('T')[0] };
-    const finance = await Finance.findOneAndUpdate({}, updateData, { new: true, upsert: true });
+    const updateData = { totalIncome, totalExpense, balance, breakdown, transactions, lastUpdated: new Date().toISOString().split('T')[0], reunionId: query.reunionId };
+    const finance = await Finance.findOneAndUpdate(query, updateData, { new: true, upsert: true });
     res.json({ success: true, message: 'আর্থিক হিসাব আপডেট করা হয়েছে', data: finance });
   } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
 };

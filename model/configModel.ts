@@ -4,6 +4,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IGlobalConfig extends Document {
   siteTitle: string;
+  siteSubtitle: string;
   eventDate: string;
   eventVenue: string;
   registrationFee: string;
@@ -34,6 +35,7 @@ export interface IGlobalConfig extends Document {
 }
 const globalConfigSchema = new Schema<IGlobalConfig>({
   siteTitle: { type: String, default: 'ত্রিশাল সরকারি নজরুল একাডেমি' },
+  siteSubtitle: { type: String, default: 'প্রাক্তন ছাত্র-ছাত্রী অ্যালামনাই অ্যাসোসিয়েশন ও পুনর্মিলনী উৎসব ২০২৬' },
   eventDate: { type: String },
   eventVenue: { type: String },
   registrationFee: { type: String },
@@ -93,6 +95,7 @@ export interface IFinance extends Document {
   lastUpdated: string;
   breakdown: any[];
   transactions: any[];
+  reunionId?: string;
 }
 const financeSchema = new Schema<IFinance>({
   totalIncome: { type: Number, default: 0 },
@@ -101,5 +104,6 @@ const financeSchema = new Schema<IFinance>({
   lastUpdated: { type: String },
   breakdown: [{ type: Schema.Types.Mixed }],
   transactions: [{ type: Schema.Types.Mixed }],
+  reunionId: { type: String },
 }, { timestamps: true, strict: false });
 export const Finance = mongoose.model<IFinance>('Finance', financeSchema);

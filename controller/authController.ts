@@ -5,6 +5,7 @@ import { User } from '../model/userModel';
 import { GlobalConfig, Stats } from '../model/configModel';
 import { sendOTPEmail } from '../utils/emailService';
 import { Student } from '../model/studentModel';
+import mongoose from 'mongoose';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'trishal-nazrul-academy-secret-key-2026';
 const verificationCodes: Record<string, { code: string; expiresAt: number }> = {};
@@ -14,15 +15,13 @@ export const sendVerification = async (req: Request, res: Response) => {
     const { email } = req.body;
     if (!email || !email.includes('@')) return res.status(400).json({ success: false, message: 'সঠিক ইমেইল দিন' });
     const normalizedEmail = email.toLowerCase().trim();
-    const existingStudent = await Student.findOne({ email: normalizedEmail });
-    if (existingStudent) return res.status(400).json({ success: false, message: 'এই ইমেইল দিয়ে ইতোমধ্যে নিবন্ধন করা হয়েছে।' });
+    const activeReunion = await mongoose.model('Reunion').findOne({ isActive: true });
+    const existingStudent = await Student.findOne({ email: normalizedEmail, reunionId: activeReunion?.id });
+    if (existingStudent) return res.status(400).json({ success: false, message: 'এই ইমেইল দিয়ে বর্তমান ইভেন্টে ইতোমধ্যে নিবন্ধন করা হয়েছে।' });
 
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser && existingUser.role === 'admin') {
       return res.status(400).json({ success: false, message: 'এই ইমেইলটি সংরক্ষিত।' });
-    }
-    if (existingUser && existingUser.role !== 'admin') {
-      await User.deleteMany({ email: normalizedEmail, role: { $ne: 'admin' } });
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -149,37 +148,28 @@ export const checkAvailability = async (req: Request, res: Response) => {
     const { email, phone, transactionId } = req.body;
     let errors: Record<string, string> = {};
 
+    const activeReunion = await mongoose.model('Reunion').findOne({ isActive: true });
     if (email) {
       const normalizedEmail = email.toLowerCase().trim();
-      const existingStudent = await Student.findOne({ email: normalizedEmail });
+      const existingStudent = await Student.findOne({ email: normalizedEmail, reunionId: activeReunion?.id });
       const existingUser = await User.findOne({ email: normalizedEmail });
 
       if (existingStudent) {
-        errors.email = 'এই ইমেইল দিয়ে ইতোমধ্যে নিবন্ধন করা হয়েছে।';
-      } else if (existingUser) {
-        if (existingUser.role === 'admin') {
-          errors.email = 'এই ইমেইলটি অ্যাডমিন অ্যাকাউন্ট হিসেবে সংরক্ষিত।';
-        } else {
-          // Orphaned user whose student registration was deleted by admin -> Clean up automatically
-          await User.deleteMany({ email: normalizedEmail, role: { $ne: 'admin' } });
-        }
+        errors.email = 'এই ইমেইল দিয়ে বর্তমান ইভেন্টে ইতোমধ্যে নিবন্ধন করা হয়েছে।';
+      } else if (existingUser && existingUser.role === 'admin') {
+        errors.email = 'এই ইমেইলটি অ্যাডমিন অ্যাকাউন্ট হিসেবে সংরক্ষিত।';
       }
     }
     
     if (phone) {
       const trimmedPhone = phone.trim();
-      const existingStudent = await Student.findOne({ phone: trimmedPhone });
+      const existingStudent = await Student.findOne({ phone: trimmedPhone, reunionId: activeReunion?.id });
       const existingUser = await User.findOne({ phone: trimmedPhone });
 
       if (existingStudent) {
-        errors.phone = 'এই মোবাইল নম্বর দিয়ে ইতোমধ্যে নিবন্ধন করা হয়েছে।';
-      } else if (existingUser) {
-        if (existingUser.role === 'admin') {
-          errors.phone = 'এই মোবাইল নম্বরটি সংরক্ষিত।';
-        } else {
-          // Orphaned user whose student registration was deleted by admin -> Clean up automatically
-          await User.deleteMany({ phone: trimmedPhone, role: { $ne: 'admin' } });
-        }
+        errors.phone = 'এই মোবাইল নম্বর দিয়ে বর্তমান ইভেন্টে ইতোমধ্যে নিবন্ধন করা হয়েছে।';
+      } else if (existingUser && existingUser.role === 'admin') {
+        errors.phone = 'এই মোবাইল নম্বরটি সংরক্ষিত।';
       }
     }
     
@@ -218,30 +208,19 @@ export const register = async (req: Request, res: Response) => {
     const normalizedEmail = email.toLowerCase().trim();
     const trimmedPhone = phone ? phone.trim() : '';
 
-    // Check if an active student registration exists
-    const existingStudentEmail = await Student.findOne({ email: normalizedEmail });
+    const activeReunion = await mongoose.model('Reunion').findOne({ isActive: true });
+    
+    // Check if an active student registration exists FOR THIS REUNION
+    const existingStudentEmail = await Student.findOne({ email: normalizedEmail, reunionId: activeReunion?.id });
     if (existingStudentEmail) {
-      return res.status(400).json({ success: false, message: 'এই ইমেইল দিয়ে ইতোমধ্যে নিবন্ধন করা হয়েছে।' });
+      return res.status(400).json({ success: false, message: 'এই ইমেইল দিয়ে বর্তমান ইভেন্টে ইতোমধ্যে নিবন্ধন করা হয়েছে।' });
     }
 
     if (trimmedPhone) {
-      const existingStudentPhone = await Student.findOne({ phone: trimmedPhone });
+      const existingStudentPhone = await Student.findOne({ phone: trimmedPhone, reunionId: activeReunion?.id });
       if (existingStudentPhone) {
-        return res.status(400).json({ success: false, message: 'এই মোবাইল নম্বর দিয়ে ইতোমধ্যে নিবন্ধন করা হয়েছে।' });
+        return res.status(400).json({ success: false, message: 'এই মোবাইল নম্বর দিয়ে বর্তমান ইভেন্টে ইতোমধ্যে নিবন্ধন করা হয়েছে।' });
       }
-    }
-
-    const existingUser = await User.findOne({ email: normalizedEmail });
-    if (existingUser) {
-      if (existingUser.role === 'admin') {
-        return res.status(400).json({ success: false, message: 'এই ইমেইল দিয়ে নিবন্ধন সম্ভব নয়।' });
-      }
-      // Remove any stale non-admin user record so new registration proceeds smoothly
-      await User.deleteMany({ email: normalizedEmail, role: { $ne: 'admin' } });
-    }
-
-    if (trimmedPhone) {
-      await User.deleteMany({ phone: trimmedPhone, role: { $ne: 'admin' } });
     }
 
     const config = await GlobalConfig.findOne() || await GlobalConfig.create({});
@@ -271,19 +250,43 @@ export const register = async (req: Request, res: Response) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const isBatchOld = parseInt(batch?.replace(/\D/g, '') || '2026', 10) < 2011;
-    const userId = 'usr-' + Date.now();
-
-    const newUser = new User({
-      id: userId, email: email.toLowerCase(), passwordHash, name, nameEn: nameEn || name,
-      bloodGroup: bloodGroup || 'O+', batch: batch?.includes('ব্যাচ') ? batch : `ব্যাচ ${batch || '২০১০'}`,
-      location: location || 'ত্রিশাল', school: school || 'ত্রিশাল একাডেমি', currentJob: currentJob || 'পেশাজীবী',
-      company: company || '', image: image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&q=80',
-      phone: phone || '', tshirtSize: tshirtSize || 'L',
-      registrationFee: Number(registrationFee) || 0,
-      paymentMethod: paymentMethod || 'bkash',
-      transactionId: transactionId || ''
-    });
-    await newUser.save();
+    
+    let newUser = await User.findOne({ email: normalizedEmail });
+    if (newUser) {
+      if (newUser.role === 'admin') {
+        return res.status(400).json({ success: false, message: 'এই ইমেইল দিয়ে নিবন্ধন সম্ভব নয়।' });
+      }
+      // Update existing user with new details for the new reunion
+      newUser.passwordHash = passwordHash;
+      newUser.name = name;
+      if (nameEn) newUser.nameEn = nameEn;
+      if (bloodGroup) newUser.bloodGroup = bloodGroup;
+      if (batch) newUser.batch = batch?.includes('ব্যাচ') ? batch : `ব্যাচ ${batch || '২০১০'}`;
+      if (location) newUser.location = location;
+      if (school) newUser.school = school;
+      if (currentJob) newUser.currentJob = currentJob;
+      if (company) newUser.company = company;
+      if (image) newUser.image = image;
+      if (phone) newUser.phone = phone;
+      if (tshirtSize) newUser.tshirtSize = tshirtSize;
+      newUser.registrationFee = Number(registrationFee) || 0;
+      newUser.paymentMethod = paymentMethod || 'bkash';
+      newUser.transactionId = transactionId || '';
+      await newUser.save();
+    } else {
+      const userId = 'usr-' + Date.now();
+      newUser = new User({
+        id: userId, email: normalizedEmail, passwordHash, name, nameEn: nameEn || name,
+        bloodGroup: bloodGroup || 'O+', batch: batch?.includes('ব্যাচ') ? batch : `ব্যাচ ${batch || '২০১০'}`,
+        location: location || 'ত্রিশাল', school: school || 'ত্রিশাল একাডেমি', currentJob: currentJob || 'পেশাজীবী',
+        company: company || '', image: image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&q=80',
+        phone: phone || '', tshirtSize: tshirtSize || 'L',
+        registrationFee: Number(registrationFee) || 0,
+        paymentMethod: paymentMethod || 'bkash',
+        transactionId: transactionId || ''
+      });
+      await newUser.save();
+    }
 
     const newStudent = new Student({
       id: 'std-' + Date.now(), name: newUser.name, nameEn: newUser.nameEn, image: newUser.image,
@@ -292,7 +295,8 @@ export const register = async (req: Request, res: Response) => {
       currentJob: newUser.currentJob, company: newUser.company, tshirtSize: newUser.tshirtSize,
       registrationFee: newUser.registrationFee,
       paymentMethod: newUser.paymentMethod,
-      transactionId: newUser.transactionId
+      transactionId: newUser.transactionId,
+      reunionId: activeReunion ? activeReunion.id : undefined
     });
     await newStudent.save();
 

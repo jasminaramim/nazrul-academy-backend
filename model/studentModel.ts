@@ -18,6 +18,7 @@ export interface IStudent extends Document {
   status: string;
   registrationFee?: number;
   transactionId?: string;
+  reunionId?: string; // Links to the specific reunion event
 }
 
 const studentSchema = new Schema<IStudent>({
@@ -38,6 +39,7 @@ const studentSchema = new Schema<IStudent>({
   status: { type: String, default: 'pending' },
   registrationFee: { type: Number },
   transactionId: { type: String },
+  reunionId: { type: String }, // optional, for backward compatibility or linking
 }, { timestamps: true, strict: false });
 
 export const Student = mongoose.model<IStudent>('Student', studentSchema);

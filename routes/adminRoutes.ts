@@ -4,7 +4,7 @@ import {
   getGlobalConfig, updateGlobalConfig,
   getContact, updateContact,
   getAdminInfo, updateAdminInfo,
-  getFinance, updateFinance,
+  getFinance, updateFinance, getGlobalFinance,
   getStats, updateStats,
   getMongoConfig, updateMongoConfig, forceMongoSync, seedDemoData, getMongoCollectionDocs,
   approveRegistration,
@@ -23,6 +23,7 @@ router.get('/admin/info', getAdminInfo);
 router.put('/admin/info', authenticateToken, requireAdmin, updateAdminInfo);
 
 router.get('/finance', getFinance);
+router.get('/finance/global', getGlobalFinance);
 router.put('/finance', authenticateToken, requireAdmin, updateFinance);
 
 router.get('/stats', getStats);
