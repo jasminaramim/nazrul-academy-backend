@@ -284,7 +284,7 @@ export const approveRegistration = async (req: Request, res: Response) => {
     const user = await User.findOne({ email: student.email });
     if (!user) return res.status(404).json({ success: false, message: 'ইউজার পাওয়া যায়নি' });
     
-    if (student.status === 'approved' || user.status === 'approved') {
+    if (student.status === 'approved') {
       return res.status(400).json({ success: false, message: 'আগেই অনুমোদন করা হয়েছে' });
     }
 
