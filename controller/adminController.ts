@@ -186,6 +186,7 @@ export const getGlobalFinance = async (req: Request, res: Response) => {
     });
 
     const globalDonationFund = totalDonationIncome + globalManualDonationIncome - globalDonationExpense;
+    const globalTotalDonationIncome = totalDonationIncome + globalManualDonationIncome;
 
     const grandTotalIncome = totalRegistrationIncome + totalDonationIncome + totalManualIncome;
     const grandTotalExpense = totalManualExpense;
