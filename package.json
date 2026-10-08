@@ -4,9 +4,9 @@
   "description": "Trishal Nazrul Academy - Backend API Server",
   "main": "server.ts",
   "scripts": {
-    "dev": "node api.js && tsx watch server.ts",
-    "build": "node api.js && esbuild server.ts --bundle --platform=node --target=node12 --format=cjs --sourcemap --outfile=dist/server.cjs",
-    "start": "node api.js && node dist/server.cjs",
+    "dev": "tsx watch server.ts",
+    "build": "esbuild server.ts --bundle --platform=node --target=node12 --format=cjs --sourcemap --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
