@@ -98,16 +98,26 @@ export interface ITeacherMsg extends Document {
   id: string;
   name: string;
   designation: string;
+  schoolName?: string;
   image: string;
-  message: string;
+  heading?: string;
+  bismillahText?: string;
+  greeting?: string;
+  description?: string;
+  message?: string;
   order: number;
 }
 const teacherSchema = new Schema<ITeacherMsg>({
   id: { type: String, required: true, unique: true },
   name: { type: String, required: true },
   designation: { type: String, required: true },
+  schoolName: { type: String },
   image: { type: String, required: true },
-  message: { type: String, required: true },
+  heading: { type: String },
+  bismillahText: { type: String },
+  greeting: { type: String },
+  description: { type: String },
+  message: { type: String },
   order: { type: Number, default: 0 },
 }, { timestamps: true, strict: false });
 export const TeacherMessage = mongoose.model<ITeacherMsg>('Teacher', teacherSchema);
