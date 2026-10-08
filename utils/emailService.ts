@@ -473,7 +473,7 @@ export async function sendStudentApprovalEmail({
       subject,
       relatedId: studentId || transactionId,
       status: 'sent',
-      metadata: { batch, phone, registrationFee, transactionId, paymentMethod },
+      metadata: { batch, phone, registrationFee, transactionId, paymentMethod, cardImageData },
       htmlContent,
     });
 
@@ -488,7 +488,7 @@ export async function sendStudentApprovalEmail({
       relatedId: studentId || transactionId,
       status: 'failed',
       errorMessage: error.message || 'ইমেইল সেন্ড ত্রুটি',
-      metadata: { batch, phone, registrationFee, transactionId, paymentMethod },
+      metadata: { batch, phone, registrationFee, transactionId, paymentMethod, cardImageData },
       htmlContent,
     });
     return { success: false, message: error.message || 'ইমেইল পাঠানো সম্ভব হয়নি।', logId: log?.id };
@@ -523,11 +523,22 @@ export async function resendEmailById(logId: string): Promise<{ success: boolean
       return { success: true, message: 'ইমেইল সফলভাবে পুনরায় পাঠানো হয়েছে (মক সার্ভিস)।', log };
     }
 
+    let attachments = undefined;
+    if (log.metadata && log.metadata.cardImageData) {
+      attachments = [
+        {
+          filename: `ID-Card-${log.recipientName}.jpg`,
+          path: log.metadata.cardImageData
+        }
+      ];
+    }
+
     await transporter.sendMail({
       from: `"ত্রিশাল নজরুল একাডেমি" <${process.env.SMTP_USER || process.env.EMAIL_USER || 'no-reply@trishalnazrulacademy.edu.bd'}>`,
       to: log.recipientEmail,
       subject: log.subject,
       html: log.htmlContent || `<p>ত্রিশাল সরকারি নজরুল একাডেমি বিজ্ঞপ্তি</p>`,
+      attachments
     });
 
     log.attempts += 1;
