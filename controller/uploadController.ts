@@ -4,9 +4,9 @@ import { v2 as cloudinary } from 'cloudinary';
 export const uploadImage = async (req: Request, res: Response) => {
   // Explicit configuration to ensure it never fails
   cloudinary.config({
-    cloud_name: process.env.VITE_CLOUDINARY_CLOUD_NAME || 'dbmnia6qh',
-    api_key: process.env.CLOUDINARY_API_KEY || '511784252694518',
-    api_secret: process.env.CLOUDINARY_API_SECRET || '8bWsPY1PL7S_CcC_JwORPYZ3iMg',
+    cloud_name: process.env.VITE_CLOUDINARY_CLOUD_NAME || 'zscxtz3w',
+    api_key: process.env.CLOUDINARY_API_KEY || '994778253158233',
+    api_secret: process.env.CLOUDINARY_API_SECRET || 'rCk6zXVwh-66-Md8zmC2ZqIxwlo',
   });
 
   try {
