@@ -48,6 +48,29 @@ export const updateStudent = async (req: Request, res: Response) => {
   try {
     const updated = await Student.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
     if (!updated) return res.status(404).json({ success: false, message: 'পাওয়া যায়নি' });
+
+    // Sync corresponding User account if exists
+    if (updated.email || updated.phone || updated.id) {
+      const userUpdates: any = {};
+      if (req.body.name !== undefined) userUpdates.name = req.body.name;
+      if (req.body.nameEn !== undefined) userUpdates.nameEn = req.body.nameEn;
+      if (req.body.batch !== undefined) userUpdates.batch = req.body.batch;
+      if (req.body.bloodGroup !== undefined) userUpdates.bloodGroup = req.body.bloodGroup;
+      if (req.body.location !== undefined) userUpdates.location = req.body.location;
+      if (req.body.currentJob !== undefined) userUpdates.currentJob = req.body.currentJob;
+      if (req.body.company !== undefined) userUpdates.company = req.body.company;
+      if (req.body.image !== undefined) userUpdates.image = req.body.image;
+      if (req.body.tshirtSize !== undefined) userUpdates.tshirtSize = req.body.tshirtSize;
+
+      const orConditions: any[] = [{ id: req.params.id }];
+      if (updated.email) orConditions.push({ email: updated.email.toLowerCase() });
+      if (updated.phone) orConditions.push({ phone: updated.phone });
+
+      if (Object.keys(userUpdates).length > 0) {
+        await User.updateMany({ $or: orConditions }, { $set: userUpdates });
+      }
+    }
+
     res.json({ success: true, data: updated });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
