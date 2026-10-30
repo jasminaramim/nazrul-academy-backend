@@ -29,8 +29,20 @@ interface OtpEmailParams {
   purpose: 'registration' | 'password_reset' | 'admin_login';
 }
 
-// Create reusable transporter object using SMTP transport or fallback
+// Create reusable transporter object using Gmail (Top Priority) or SMTP fallback
 function getTransporter() {
+  // 1. Google Gmail direct (Instant, 1-second 100% Inbox delivery via Google)
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER.trim(),
+        pass: process.env.EMAIL_PASS.replace(/\s+/g, ''),
+      },
+    });
+  }
+
+  // 2. Custom Domain SMTP fallback
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT) || 587;
   const user = process.env.SMTP_USER;
@@ -44,17 +56,6 @@ function getTransporter() {
       auth: { user, pass },
       tls: {
         rejectUnauthorized: false,
-      },
-    });
-  }
-
-  // Gmail service configuration
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    return nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER.trim(),
-        pass: process.env.EMAIL_PASS.replace(/\s+/g, ''),
       },
     });
   }
@@ -146,7 +147,7 @@ export async function sendOTPEmail({ to, otp, purpose }: OtpEmailParams): Promis
     }
 
     const info = await transporter.sendMail({
-      from: `"ত্রিশাল নজরুল একাডেমি" <${process.env.SMTP_USER || process.env.EMAIL_USER || 'no-reply@trishalnazrulacademy.edu.bd'}>`,
+      from: `"ত্রিশাল নজরুল একাডেমি" <${process.env.EMAIL_USER || process.env.SMTP_USER || 'no-reply@trishalnazrulacademy.edu.bd'}>`,
       to,
       subject,
       html: htmlContent,
