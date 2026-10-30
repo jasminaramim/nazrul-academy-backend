@@ -29,15 +29,22 @@ interface OtpEmailParams {
   purpose: 'registration' | 'password_reset' | 'admin_login';
 }
 
+// Official Google Gmail configuration for instant 1-second 100% inbox delivery
+const DEFAULT_GMAIL_USER = 'nazrulacademydarirampur@gmail.com';
+const DEFAULT_GMAIL_PASS = 'gpwnaalf rffdboyk';
+
 // Create reusable transporter object using Gmail (Top Priority) or SMTP fallback
 function getTransporter() {
-  // 1. Google Gmail direct (Instant, 1-second 100% Inbox delivery via Google)
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  // 1. Google Gmail direct (Highest Priority, works on local and live server)
+  const gmailUser = (process.env.EMAIL_USER || DEFAULT_GMAIL_USER).trim();
+  const gmailPass = (process.env.EMAIL_PASS || DEFAULT_GMAIL_PASS).replace(/\s+/g, '');
+
+  if (gmailUser && gmailPass) {
     return nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: process.env.EMAIL_USER.trim(),
-        pass: process.env.EMAIL_PASS.replace(/\s+/g, ''),
+        user: gmailUser,
+        pass: gmailPass,
       },
     });
   }
@@ -146,8 +153,9 @@ export async function sendOTPEmail({ to, otp, purpose }: OtpEmailParams): Promis
       return { success: true, message: 'মক সার্ভিস: ওটিপি কনসোলে প্রিন্ট করা হয়েছে।' };
     }
 
+    const senderEmail = (process.env.EMAIL_USER || DEFAULT_GMAIL_USER).trim();
     const info = await transporter.sendMail({
-      from: `"ত্রিশাল নজরুল একাডেমি" <${process.env.EMAIL_USER || process.env.SMTP_USER || 'no-reply@trishalnazrulacademy.edu.bd'}>`,
+      from: `"ত্রিশাল নজরুল একাডেমি" <${senderEmail}>`,
       to,
       subject,
       html: htmlContent,
@@ -318,8 +326,9 @@ export async function sendDonationApprovalEmail({
       };
     }
 
+    const senderEmail = (process.env.EMAIL_USER || DEFAULT_GMAIL_USER).trim();
     await transporter.sendMail({
-      from: `"ত্রিশাল নজরুল একাডেমি" <${process.env.SMTP_USER || process.env.EMAIL_USER || 'no-reply@trishalnazrulacademy.edu.bd'}>`,
+      from: `"ত্রিশাল নজরুল একাডেমি" <${senderEmail}>`,
       to,
       subject,
       html: htmlContent,
@@ -488,8 +497,9 @@ export async function sendStudentApprovalEmail({
       };
     }
 
+    const senderEmail = (process.env.EMAIL_USER || DEFAULT_GMAIL_USER).trim();
     await transporter.sendMail({
-      from: `"ত্রিশাল নজরুল একাডেমি" <${process.env.SMTP_USER || process.env.EMAIL_USER || 'no-reply@trishalnazrulacademy.edu.bd'}>`,
+      from: `"ত্রিশাল নজরুল একাডেমি" <${senderEmail}>`,
       to,
       subject,
       html: htmlContent,
@@ -568,8 +578,9 @@ export async function resendEmailById(logId: string): Promise<{ success: boolean
       ];
     }
 
+    const senderEmail = (process.env.EMAIL_USER || DEFAULT_GMAIL_USER).trim();
     await transporter.sendMail({
-      from: `"ত্রিশাল নজরুল একাডেমি" <${process.env.SMTP_USER || process.env.EMAIL_USER || 'no-reply@trishalnazrulacademy.edu.bd'}>`,
+      from: `"ত্রিশাল নজরুল একাডেমি" <${senderEmail}>`,
       to: log.recipientEmail,
       subject: log.subject,
       html: log.htmlContent || `<p>ত্রিশাল সরকারি নজরুল একাডেমি বিজ্ঞপ্তি</p>`,

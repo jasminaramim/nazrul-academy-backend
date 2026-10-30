@@ -430,6 +430,7 @@ export const login = async (req: Request, res: Response) => {
         admin2FACodes[user.email] = { code, expiresAt: Date.now() + 10 * 60 * 1000 };
         
         console.log(`[Admin 2FA] 🔐 Triggering 2FA for: "${user.email}" (Username: ${rawIdentifier})`);
+        console.log(`[Admin 2FA] 🔑 Generated Security OTP Code: 👉 ${code} 👈`);
         
         const emailRes = await sendOTPEmail({
           to: user.email,
