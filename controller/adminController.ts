@@ -116,24 +116,52 @@ export const getFinance = async (req: Request, res: Response) => {
     const globalTotalDonationIncome = totalDonations + globalManualDonationIncome;
 
     // Calculate transaction sums for CURRENT EVENT
-    let manualIncome = 0;
+    let manualRegIncome = 0;
+    let manualDonationIncome = 0;
+    let manualOtherIncome = 0;
     let manualExpense = 0;
+
     if (finance.transactions && Array.isArray(finance.transactions)) {
       finance.transactions.forEach((t: any) => {
-        if (t.type === 'income' && t.source !== 'Registration' && t.source !== 'Donation') manualIncome += (Number(t.amount) || 0);
-        if (t.type === 'expense') manualExpense += (Number(t.amount) || 0);
+        if (t.type === 'income') {
+          // If transaction is from student registration sync (has source === 'Registration'), skip to avoid double counting
+          if (t.source === 'Registration') return;
+
+          const isReg = t.fundSource === 'registration' || 
+                        /নিবন্ধন|registration/i.test(t.category || '') ||
+                        /নিবন্ধন|registration/i.test(t.title || '');
+          const isDon = t.fundSource === 'donation' || 
+                        /অনুদান|donation/i.test(t.category || '') ||
+                        /অনুদান|donation/i.test(t.title || '');
+
+          if (isReg) {
+            manualRegIncome += (Number(t.amount) || 0);
+          } else if (isDon) {
+            manualDonationIncome += (Number(t.amount) || 0);
+          } else {
+            manualOtherIncome += (Number(t.amount) || 0);
+          }
+        }
+        if (t.type === 'expense') {
+          manualExpense += (Number(t.amount) || 0);
+        }
       });
     }
 
-    finance.totalIncome = manualIncome + totalStudentIncome;
+    const totalRegistrationIncome = totalStudentIncome + manualRegIncome;
+    const currentEventTotalDonation = totalDonations + manualDonationIncome;
+    finance.totalIncome = totalRegistrationIncome + currentEventTotalDonation + manualOtherIncome;
     finance.totalExpense = manualExpense;
     finance.balance = finance.totalIncome - finance.totalExpense;
 
     // Update the breakdown explicitly
     finance.breakdown = {
       ...((!Array.isArray(finance.breakdown) && finance.breakdown) || {}),
-      registrationFees: totalStudentIncome,
-      donations: totalDonations
+      onlineRegistrationFees: totalStudentIncome,
+      manualRegistrationFees: manualRegIncome,
+      registrationFees: totalRegistrationIncome,
+      donations: currentEventTotalDonation,
+      otherIncome: manualOtherIncome
     };
 
     // Return finance as object and attach globalDonationFund
@@ -168,14 +196,31 @@ export const getGlobalFinance = async (req: Request, res: Response) => {
     let totalManualIncome = 0;
     let totalManualExpense = 0;
     let globalManualDonationIncome = 0;
+    let globalManualRegIncome = 0;
+    let globalManualOtherIncome = 0;
     let globalDonationExpense = 0;
     
     finances.forEach((f: any) => {
       if (f.transactions && Array.isArray(f.transactions)) {
         f.transactions.forEach((t: any) => {
           if (t.type === 'income') {
-            if (t.fundSource === 'donation') globalManualDonationIncome += (Number(t.amount) || 0);
-            if (t.source !== 'Registration' && t.source !== 'Donation') totalManualIncome += (Number(t.amount) || 0);
+            if (t.source === 'Registration') return;
+
+            const isReg = t.fundSource === 'registration' || 
+                          /নিবন্ধন|registration/i.test(t.category || '') ||
+                          /নিবন্ধন|registration/i.test(t.title || '');
+            const isDon = t.fundSource === 'donation' || 
+                          /অনুদান|donation/i.test(t.category || '') ||
+                          /অনুদান|donation/i.test(t.title || '');
+
+            if (isReg) {
+              globalManualRegIncome += (Number(t.amount) || 0);
+            } else if (isDon) {
+              globalManualDonationIncome += (Number(t.amount) || 0);
+            } else {
+              globalManualOtherIncome += (Number(t.amount) || 0);
+            }
+            totalManualIncome += (Number(t.amount) || 0);
           }
           if (t.type === 'expense') {
             if (t.fundSource === 'donation') globalDonationExpense += (Number(t.amount) || 0);
@@ -185,17 +230,20 @@ export const getGlobalFinance = async (req: Request, res: Response) => {
       }
     });
 
+    const totalFinalRegistrationIncome = totalRegistrationIncome + globalManualRegIncome;
     const globalDonationFund = totalDonationIncome + globalManualDonationIncome - globalDonationExpense;
     const globalTotalDonationIncome = totalDonationIncome + globalManualDonationIncome;
 
-    const grandTotalIncome = totalRegistrationIncome + totalDonationIncome + totalManualIncome;
+    const grandTotalIncome = totalFinalRegistrationIncome + globalTotalDonationIncome + globalManualOtherIncome;
     const grandTotalExpense = totalManualExpense;
     const grandBalance = grandTotalIncome - grandTotalExpense;
 
     res.json({
       success: true,
       data: {
-        totalRegistrationIncome,
+        totalOnlineRegistrationIncome: totalRegistrationIncome,
+        totalManualRegistrationIncome: globalManualRegIncome,
+        totalRegistrationIncome: totalFinalRegistrationIncome,
         totalDonationIncome,
         totalManualIncome,
         totalManualExpense,
