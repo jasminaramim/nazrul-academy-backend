@@ -124,8 +124,8 @@ export const getFinance = async (req: Request, res: Response) => {
     if (finance.transactions && Array.isArray(finance.transactions)) {
       finance.transactions.forEach((t: any) => {
         if (t.type === 'income') {
-          // If transaction is from student registration sync (has source === 'Registration'), skip to avoid double counting
-          if (t.source === 'Registration') return;
+          // If transaction is from student registration or donor sync (has source === 'Registration' | 'Donation'), skip to avoid double counting
+          if (t.source === 'Registration' || t.source === 'Donation') return;
 
           const isReg = t.fundSource === 'registration' || 
                         /নিবন্ধন|registration/i.test(t.category || '') ||
@@ -204,7 +204,7 @@ export const getGlobalFinance = async (req: Request, res: Response) => {
       if (f.transactions && Array.isArray(f.transactions)) {
         f.transactions.forEach((t: any) => {
           if (t.type === 'income') {
-            if (t.source === 'Registration') return;
+            if (t.source === 'Registration' || t.source === 'Donation') return;
 
             const isReg = t.fundSource === 'registration' || 
                           /নিবন্ধন|registration/i.test(t.category || '') ||
