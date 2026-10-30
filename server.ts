@@ -6,12 +6,17 @@ import mongoSanitize from 'express-mongo-sanitize';
 import routes from './routes/index';
 import { connectDB } from './config/dbConfig';
 
+import { apiLimiter } from './middleware/rateLimiter';
+
 // Load env - works both locally and on Vercel (via Vercel env vars)
 dotenv.config();
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;
 
 const app = express();
+
+// Trust reverse proxies (Vercel, cPanel, Nginx, Cloudflare) for accurate client IP detection
+app.set('trust proxy', 1);
 
 // Security Middlewares
 app.use(helmet()); // Adds security headers
@@ -38,6 +43,9 @@ app.use(cors({
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Global API Rate Limiting (DDoS & Scraping Protection)
+app.use('/api', apiLimiter);
 
 // API Routes
 app.use('/api', routes);
