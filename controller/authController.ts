@@ -261,26 +261,33 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // 5. Cloudflare Turnstile Bot Check (if secret is configured)
-    const cfSecret = process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY;
-    if (cfSecret && turnstileToken) {
+    // 5. Cloudflare Turnstile Bot Check (Canonical siteverify)
+    const cfSecret = (process.env.TURNSTILE_SECRET || process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY || '0x4AAAAAAFtEBGMj350zbyNkzadJDrNgE10').trim();
+    const cfToken = req.body['cf-turnstile-response'] || turnstileToken;
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || req.ip || '';
+
+    if (cfToken) {
       try {
         const cfRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          signal: AbortSignal.timeout(10000),
           body: new URLSearchParams({
             secret: cfSecret,
-            response: turnstileToken,
-            remoteip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || ''
+            response: cfToken,
+            remoteip: clientIp
           })
         });
         const cfData: any = await cfRes.json();
+        console.log('[Turnstile Siteverify Result]:', cfData);
         if (!cfData.success) {
-          return res.status(400).json({ success: false, message: 'ক্লাউডফ্লেয়ার সিকিউরিটি ভেরিফিকেশন ব্যর্থ হয়েছে।' });
+          return res.status(403).json({ success: false, message: 'ক্লাউডফ্লেয়ার সিকিউরিটি ভেরিফিকেশন (Turnstile) ব্যর্থ হয়েছে।' });
         }
-      } catch (cfErr) {
-        console.error('Turnstile verification check error:', cfErr);
+      } catch (cfErr: any) {
+        console.error('Turnstile verification error:', cfErr.message);
       }
+    } else if (cfSecret && process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ success: false, message: 'অনুগ্রহ করে ক্যাপচা (Turnstile) সম্পন্ন করুন।' });
     }
 
     const activeReunion = await mongoose.model('Reunion').findOne({ isActive: true });
