@@ -33,41 +33,66 @@ interface OtpEmailParams {
 const DEFAULT_GMAIL_USER = 'nazrulacademydarirampur@gmail.com';
 const DEFAULT_GMAIL_PASS = 'gpwnaalf rffdboyk';
 
-// Create reusable transporter object using Gmail (Top Priority) or SMTP fallback
-function getTransporter() {
-  // 1. Google Gmail direct (Highest Priority, works on local and live server)
+// Smart Multi-Engine Email Dispatcher:
+// Tier 1: Gmail Port 587 TLS (Direct Google SMTP, avoids shared-hosting Port 465 blocking)
+// Tier 2: HostSeba Domain Mail Port 587 (Local server delivery, 100% accessible on HostSeba)
+export async function sendMailWithSmartFallback(options: {
+  to: string;
+  subject: string;
+  html: string;
+  attachments?: any[];
+}): Promise<{ messageId: string; response: string; provider: string }> {
   const gmailUser = (process.env.EMAIL_USER || DEFAULT_GMAIL_USER).trim();
   const gmailPass = (process.env.EMAIL_PASS || DEFAULT_GMAIL_PASS).replace(/\s+/g, '');
 
-  if (gmailUser && gmailPass) {
-    return nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: gmailUser,
-        pass: gmailPass,
-      },
+  // 1. Try Gmail via Port 587 (TLS)
+  try {
+    const gmailTransporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      auth: { user: gmailUser, pass: gmailPass },
+      tls: { rejectUnauthorized: false }
     });
+
+    const info = await gmailTransporter.sendMail({
+      from: `"ত্রিশাল নজরুল একাডেমি" <${gmailUser}>`,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      attachments: options.attachments,
+    });
+
+    console.log(`[EmailService] ✅ Sent via Gmail Port 587 to: "${options.to}" | MessageId: ${info.messageId}`);
+    return { messageId: info.messageId, response: info.response, provider: 'gmail_587' };
+  } catch (gmailErr: any) {
+    console.warn(`[EmailService] ⚠️ Gmail 587 attempt failed (${gmailErr.message}). Switching to HostSeba Domain SMTP fallback...`);
   }
 
-  // 2. Custom Domain SMTP fallback
-  const host = process.env.SMTP_HOST;
+  // 2. Fallback: HostSeba Domain SMTP on Port 587
+  const host = process.env.SMTP_HOST || 'mail.nazrul-academy-alumni.com';
   const port = Number(process.env.SMTP_PORT) || 587;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const user = process.env.SMTP_USER || 'info@nazrul-academy-alumni.com';
+  const pass = process.env.SMTP_PASS || '@Nazrul64249109#';
 
-  if (host && user && pass) {
-    return nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-      tls: {
-        rejectUnauthorized: false,
-      },
-    });
-  }
+  const hostsebaTransporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: false,
+    auth: { user, pass },
+    tls: { rejectUnauthorized: false }
+  });
 
-  return null;
+  const info = await hostsebaTransporter.sendMail({
+    from: `"ত্রিশাল নজরুল একাডেমি" <${user}>`,
+    to: options.to,
+    subject: options.subject,
+    html: options.html,
+    attachments: options.attachments,
+  });
+
+  console.log(`[EmailService] ✅ Sent via HostSeba Domain SMTP to: "${options.to}" | MessageId: ${info.messageId}`);
+  return { messageId: info.messageId, response: info.response, provider: 'hostseba_smtp' };
 }
 
 // Helper to record email log in MongoDB
@@ -147,21 +172,11 @@ export async function sendOTPEmail({ to, otp, purpose }: OtpEmailParams): Promis
 
     console.log(`[EmailService] 📤 Sending OTP email to: "${to}" | Purpose: ${purpose}`);
 
-    const transporter = getTransporter();
-    if (!transporter) {
-      console.log(`[EmailService] ⚠️ No SMTP configured. Mock OTP for ${to}: ${otp}`);
-      return { success: true, message: 'মক সার্ভিস: ওটিপি কনসোলে প্রিন্ট করা হয়েছে।' };
-    }
-
-    const senderEmail = (process.env.EMAIL_USER || DEFAULT_GMAIL_USER).trim();
-    const info = await transporter.sendMail({
-      from: `"ত্রিশাল নজরুল একাডেমি" <${senderEmail}>`,
+    const sendResult = await sendMailWithSmartFallback({
       to,
       subject,
       html: htmlContent,
     });
-
-    console.log(`[EmailService] ✅ Email successfully sent to: "${to}" | MessageId: ${info.messageId} | Response: ${info.response}`);
 
     const log = await recordEmailLog({
       recipientEmail: to,
@@ -169,7 +184,7 @@ export async function sendOTPEmail({ to, otp, purpose }: OtpEmailParams): Promis
       type: 'otp_verification',
       subject,
       status: 'sent',
-      metadata: { purpose, messageId: info.messageId, response: info.response },
+      metadata: { purpose, messageId: sendResult.messageId, provider: sendResult.provider },
       htmlContent,
     });
 
@@ -301,34 +316,7 @@ export async function sendDonationApprovalEmail({
       return { success: false, message: err, logId: log?.id };
     }
 
-    const transporter = getTransporter();
-
-    if (!transporter) {
-      console.log(`[Email Mock/Preview] Confirmation email ready for ${to}:`, {
-        donorName,
-        amount,
-        transactionId,
-      });
-      const log = await recordEmailLog({
-        recipientEmail: to,
-        recipientName: donorName,
-        type: 'donation_approval',
-        subject,
-        relatedId: donorId || transactionId,
-        status: 'sent',
-        metadata: { amount, transactionId, paymentMethod, batch, isMock: true },
-        htmlContent,
-      });
-      return {
-        success: true,
-        message: 'ইমেইল লগ সফলভাবে সংরক্ষিত হয়েছে।',
-        logId: log?.id,
-      };
-    }
-
-    const senderEmail = (process.env.EMAIL_USER || DEFAULT_GMAIL_USER).trim();
-    await transporter.sendMail({
-      from: `"ত্রিশাল নজরুল একাডেমি" <${senderEmail}>`,
+    const sendResult = await sendMailWithSmartFallback({
       to,
       subject,
       html: htmlContent,
@@ -472,34 +460,7 @@ export async function sendStudentApprovalEmail({
       return { success: false, message: err, logId: log?.id };
     }
 
-    const transporter = getTransporter();
-
-    if (!transporter) {
-      console.log(`[Email Mock/Preview] Student approval confirmation for ${to}:`, {
-        studentName,
-        batch,
-        registrationFee,
-      });
-      const log = await recordEmailLog({
-        recipientEmail: to,
-        recipientName: studentName,
-        type: 'student_approval',
-        subject,
-        relatedId: studentId || transactionId,
-        status: 'sent',
-        metadata: { batch, phone, registrationFee, transactionId, paymentMethod, isMock: true },
-        htmlContent,
-      });
-      return {
-        success: true,
-        message: 'ইমেইল লগ সফলভাবে সংরক্ষিত হয়েছে।',
-        logId: log?.id,
-      };
-    }
-
-    const senderEmail = (process.env.EMAIL_USER || DEFAULT_GMAIL_USER).trim();
-    await transporter.sendMail({
-      from: `"ত্রিশাল নজরুল একাডেমি" <${senderEmail}>`,
+    const sendResult = await sendMailWithSmartFallback({
       to,
       subject,
       html: htmlContent,
@@ -557,17 +518,6 @@ export async function resendEmailById(logId: string): Promise<{ success: boolean
       return { success: false, message: 'প্রাপকের ইমেইল সঠিক নয়।', log };
     }
 
-    const transporter = getTransporter();
-
-    if (!transporter) {
-      log.attempts += 1;
-      log.lastAttemptAt = new Date();
-      log.status = 'sent';
-      log.errorMessage = undefined;
-      await log.save();
-      return { success: true, message: 'ইমেইল সফলভাবে পুনরায় পাঠানো হয়েছে (মক সার্ভিস)।', log };
-    }
-
     let attachments = undefined;
     if (log.metadata && log.metadata.cardImageData) {
       attachments = [
@@ -578,9 +528,7 @@ export async function resendEmailById(logId: string): Promise<{ success: boolean
       ];
     }
 
-    const senderEmail = (process.env.EMAIL_USER || DEFAULT_GMAIL_USER).trim();
-    await transporter.sendMail({
-      from: `"ত্রিশাল নজরুল একাডেমি" <${senderEmail}>`,
+    await sendMailWithSmartFallback({
       to: log.recipientEmail,
       subject: log.subject,
       html: log.htmlContent || `<p>ত্রিশাল সরকারি নজরুল একাডেমি বিজ্ঞপ্তি</p>`,
