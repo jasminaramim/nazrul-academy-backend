@@ -429,11 +429,15 @@ export const login = async (req: Request, res: Response) => {
         const code = Math.floor(100000 + Math.random() * 900000).toString();
         admin2FACodes[user.email] = { code, expiresAt: Date.now() + 10 * 60 * 1000 };
         
-        await sendOTPEmail({
+        console.log(`[Admin 2FA] 🔐 Triggering 2FA for: "${user.email}" (Username: ${rawIdentifier})`);
+        
+        const emailRes = await sendOTPEmail({
           to: user.email,
           otp: code,
           purpose: 'admin_login'
         });
+
+        console.log(`[Admin 2FA] 📩 Email dispatch result for ${user.email}:`, emailRes);
 
         const masked = user.email.replace(/^(.)(.*)(.@.*)$/, (_, a, b, c) => a + '*'.repeat(Math.max(1, b.length)) + c);
         return res.json({
@@ -444,6 +448,8 @@ export const login = async (req: Request, res: Response) => {
           message: `অ্যাডমিন একাউন্টের সুরক্ষার্থে আপনার ইমেইলে (${masked}) ৬-সংখ্যার ওটিপি কোড পাঠানো হয়েছে।`
         });
       }
+
+      console.log(`[Admin 2FA] 🔑 Verifying 2FA code for admin: "${user.email}"`);
 
       const record = admin2FACodes[user.email];
       if (!record || Date.now() > record.expiresAt) {

@@ -133,24 +133,53 @@ export async function sendOTPEmail({ to, otp, purpose }: OtpEmailParams): Promis
 
   try {
     if (!to || !to.includes('@')) {
+      console.warn(`[EmailService] ⚠️ Invalid recipient email: ${to}`);
       return { success: false, message: 'সঠিক ইমেইল দিন' };
     }
+
+    console.log(`[EmailService] 📤 Sending OTP email to: "${to}" | Purpose: ${purpose}`);
+
     const transporter = getTransporter();
     if (!transporter) {
-      console.log(`[Email Mock] OTP for ${to}: ${otp}`);
+      console.log(`[EmailService] ⚠️ No SMTP configured. Mock OTP for ${to}: ${otp}`);
       return { success: true, message: 'মক সার্ভিস: ওটিপি কনসোলে প্রিন্ট করা হয়েছে।' };
     }
 
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: `"ত্রিশাল নজরুল একাডেমি" <${process.env.SMTP_USER || process.env.EMAIL_USER || 'no-reply@trishalnazrulacademy.edu.bd'}>`,
       to,
       subject,
       html: htmlContent,
     });
-    return { success: true, message: 'ওটিপি পাঠানো হয়েছে।' };
+
+    console.log(`[EmailService] ✅ Email successfully sent to: "${to}" | MessageId: ${info.messageId} | Response: ${info.response}`);
+
+    const log = await recordEmailLog({
+      recipientEmail: to,
+      recipientName: 'অ্যাডমিন / সদস্য',
+      type: 'otp_verification',
+      subject,
+      status: 'sent',
+      metadata: { purpose, messageId: info.messageId, response: info.response },
+      htmlContent,
+    });
+
+    return { success: true, message: 'ওটিপি পাঠানো হয়েছে।', logId: log?.id };
   } catch (error: any) {
-    console.error('Failed to send OTP email:', error);
-    return { success: false, message: 'ইমেইল পাঠানো সম্ভব হয়নি।' };
+    console.error(`[EmailService] ❌ Failed to send OTP to "${to}":`, error.message);
+
+    const log = await recordEmailLog({
+      recipientEmail: to || 'unknown',
+      recipientName: 'অ্যাডমিন / সদস্য',
+      type: 'otp_verification',
+      subject,
+      status: 'failed',
+      errorMessage: error.message || 'ইমেইল সেন্ড ত্রুটি',
+      metadata: { purpose },
+      htmlContent,
+    });
+
+    return { success: false, message: 'ইমেইল পাঠানো সম্ভব হয়নি: ' + error.message, logId: log?.id };
   }
 }
 
