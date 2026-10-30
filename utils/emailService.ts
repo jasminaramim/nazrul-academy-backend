@@ -26,7 +26,7 @@ interface StudentApprovalEmailParams {
 interface OtpEmailParams {
   to: string;
   otp: string;
-  purpose: 'registration' | 'password_reset';
+  purpose: 'registration' | 'password_reset' | 'admin_login';
 }
 
 // Create reusable transporter object using SMTP transport or fallback
@@ -111,6 +111,8 @@ export async function recordEmailLog({
 export async function sendOTPEmail({ to, otp, purpose }: OtpEmailParams): Promise<{ success: boolean; message: string; logId?: string }> {
   const subject = purpose === 'password_reset' 
     ? 'নজরুল একাডেমী অ্যালামনাই - পাসওয়ার্ড রিসেট ওটিপি (OTP)'
+    : purpose === 'admin_login'
+    ? 'নজরুল একাডেমি - অ্যাডমিন লগইন সিকিউরিটি ওটিপি (2FA OTP)'
     : 'নজরুল একাডেমী অ্যালামনাই - ইমেইল ভেরিফিকেশন কোড';
     
   const htmlContent = `

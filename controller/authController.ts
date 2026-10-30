@@ -9,6 +9,8 @@ import mongoose from 'mongoose';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'trishal-nazrul-academy-secret-key-2026';
 const verificationCodes: Record<string, { code: string; expiresAt: number }> = {};
+export const verifiedEmails: Record<string, number> = {};
+const admin2FACodes: Record<string, { code: string; expiresAt: number }> = {};
 
 export const sendVerification = async (req: Request, res: Response) => {
   try {
@@ -30,7 +32,12 @@ export const sendVerification = async (req: Request, res: Response) => {
     // Send email
     await sendOTPEmail({ to: normalizedEmail, otp: code, purpose: 'registration' });
     
-    res.json({ success: true, message: `কোড পাঠানো হয়েছে।`, code }); // Send code in response for testing if needed
+    const isDev = process.env.NODE_ENV !== 'production';
+    res.json({ 
+      success: true, 
+      message: 'আপনার ইমেইলে ৬-ডিজিটের ভেরিফিকেশন কোড পাঠানো হয়েছে।',
+      ...(isDev ? { code } : {})
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'সমস্যা হয়েছে' });
   }
@@ -188,13 +195,22 @@ export const checkAvailability = async (req: Request, res: Response) => {
 export const verifyOtp = async (req: Request, res: Response) => {
   try {
     const { email, code } = req.body;
-    const record = verificationCodes[email?.toLowerCase()?.trim()];
-    if (!record) return res.status(400).json({ success: false, message: 'কোড পাওয়া যায়নি' });
-    if (Date.now() > record.expiresAt) return res.status(400).json({ success: false, message: 'মেয়াদ শেষ' });
-    if (record.code !== code?.toString().trim()) return res.status(400).json({ success: false, message: 'ভুল কোড' });
+    if (!email || !code) return res.status(400).json({ success: false, message: 'ইমেইল ও কোড প্রয়োজন' });
+    const normalizedEmail = email.toLowerCase().trim();
+    const record = verificationCodes[normalizedEmail];
+    if (!record) return res.status(400).json({ success: false, message: 'কোড পাওয়া যায়নি বা মেয়াদ শেষ হয়েছে' });
+    if (Date.now() > record.expiresAt) {
+      delete verificationCodes[normalizedEmail];
+      return res.status(400).json({ success: false, message: 'মেয়াদ শেষ। অনুগ্রহ করে নতুন কোড নিন।' });
+    }
+    if (record.code !== code?.toString().trim()) {
+      return res.status(400).json({ success: false, message: 'ভুল কোড প্রদান করেছেন।' });
+    }
     
-    delete verificationCodes[email.toLowerCase().trim()];
-    res.json({ success: true, message: 'যাচাই সফল' });
+    delete verificationCodes[normalizedEmail];
+    // Mark email as verified for 30 minutes
+    verifiedEmails[normalizedEmail] = Date.now() + 30 * 60 * 1000;
+    res.json({ success: true, message: 'ইমেইল সফলভাবে যাচাই হয়েছে।' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'সমস্যা হয়েছে' });
   }
@@ -202,11 +218,70 @@ export const verifyOtp = async (req: Request, res: Response) => {
 
 export const register = async (req: Request, res: Response) => {
   try {
-    const { email, password, name, nameEn, bloodGroup, batch, location, school, currentJob, company, image, phone, tshirtSize, registrationFee, transactionId, paymentMethod } = req.body;
+    const { 
+      email, password, name, nameEn, bloodGroup, batch, location, school, 
+      currentJob, company, image, phone, tshirtSize, registrationFee, 
+      transactionId, paymentMethod, hp_website_url, turnstileToken 
+    } = req.body;
+
+    // 1. Honeypot Bot Trap check
+    if (hp_website_url) {
+      return res.status(400).json({ success: false, message: 'অবৈধ অনুরোধ সনাক্ত হয়েছে।' });
+    }
+
     if (!email || !password || !name) return res.status(400).json({ success: false, message: 'ইমেইল, পাসওয়ার্ড, নাম আবশ্যক' });
 
     const normalizedEmail = email.toLowerCase().trim();
     const trimmedPhone = phone ? phone.trim() : '';
+
+    // 2. Mandatory Email OTP Verification Check
+    if (!verifiedEmails[normalizedEmail] || Date.now() > verifiedEmails[normalizedEmail]) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'নিবন্ধন সম্পন্ন করতে প্রথমে আপনার ইমেইল ওটিপি (OTP) দিয়ে ভেরিফাই করুন।' 
+      });
+    }
+
+    // 3. Strict BD Phone Number Validation
+    const bdPhoneRegex = /^01[3-9]\d{8}$/;
+    const cleanPhone = trimmedPhone.replace(/[-\s+]/g, '').replace(/^88/, '');
+    if (!bdPhoneRegex.test(cleanPhone)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'অনুগ্রহ করে সঠিক ১১-সংখ্যার বাংলাদেশী মোবাইল নম্বর প্রদান করুন (যেমন: 017xxxxxxxx)।' 
+      });
+    }
+
+    // 4. Strict Transaction ID Format Validation
+    const cleanTrx = transactionId ? transactionId.trim().toUpperCase() : '';
+    if (!cleanTrx || cleanTrx.length < 6 || cleanTrx.length > 25 || !/^[A-Z0-9]+$/.test(cleanTrx)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'অনুগ্রহ করে সঠিক আলফানিউমেরিক ট্রানজ্যাকশন আইডি (Transaction ID) প্রদান করুন।' 
+      });
+    }
+
+    // 5. Cloudflare Turnstile Bot Check (if secret is configured)
+    const cfSecret = process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY;
+    if (cfSecret && turnstileToken) {
+      try {
+        const cfRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            secret: cfSecret,
+            response: turnstileToken,
+            remoteip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || ''
+          })
+        });
+        const cfData: any = await cfRes.json();
+        if (!cfData.success) {
+          return res.status(400).json({ success: false, message: 'ক্লাউডফ্লেয়ার সিকিউরিটি ভেরিফিকেশন ব্যর্থ হয়েছে।' });
+        }
+      } catch (cfErr) {
+        console.error('Turnstile verification check error:', cfErr);
+      }
+    }
 
     const activeReunion = await mongoose.model('Reunion').findOne({ isActive: true });
     
@@ -247,6 +322,9 @@ export const register = async (req: Request, res: Response) => {
         message: `বর্তমানে আমাদের ${methodBn} অ্যাকাউন্টের লেনদেনের সীমা (Limit) শেষ। অনুগ্রহ করে অন্য মাধ্যমে ফি পরিশোধ করুন।`,
       });
     }
+
+    // Clean up verified state so it cannot be used again
+    delete verifiedEmails[normalizedEmail];
 
     const passwordHash = await bcrypt.hash(password, 10);
     const isBatchOld = parseInt(batch?.replace(/\D/g, '') || '2026', 10) < 2011;
@@ -309,11 +387,11 @@ export const register = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { email, username, password } = req.body;
+    const { email, username, password, twoFactorCode } = req.body;
     const rawIdentifier = (username || email || '').toString().trim().toLowerCase();
     if (!rawIdentifier || !password) return res.status(400).json({ success: false, message: 'তথ্য প্রদান করুন' });
 
-    const SUPER_ADMIN_USERNAME = process.env.SUPER_ADMIN_USERNAME || 'admin';
+    const SUPER_ADMIN_USERNAME = (process.env.SUPER_ADMIN_USERNAME || 'admin').toLowerCase();
     const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'admin123';
 
     let user = await User.findOne({ $or: [{ email: rawIdentifier }, { username: rawIdentifier }] });
@@ -339,12 +417,53 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch && password !== SUPER_ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'ভুল তথ্য' });
+    const isSuperAdminPasswordMatch = (rawIdentifier === SUPER_ADMIN_USERNAME || user.username === SUPER_ADMIN_USERNAME) && password === SUPER_ADMIN_PASSWORD;
+
+    if (!isMatch && !isSuperAdminPasswordMatch) {
+      return res.status(401).json({ success: false, message: 'ভুল ইউজারনেম বা পাসওয়ার্ড' });
+    }
+
+    // 🔒 Admin 2FA (Two-Factor Authentication via Email OTP)
+    if (user.role === 'admin' || user.role === 'super-admin') {
+      if (!twoFactorCode) {
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        admin2FACodes[user.email] = { code, expiresAt: Date.now() + 10 * 60 * 1000 };
+        
+        await sendOTPEmail({
+          to: user.email,
+          otp: code,
+          purpose: 'admin_login'
+        });
+
+        const masked = user.email.replace(/^(.)(.*)(.@.*)$/, (_, a, b, c) => a + '*'.repeat(Math.max(1, b.length)) + c);
+        return res.json({
+          success: true,
+          requires2FA: true,
+          email: user.email,
+          maskedEmail: masked,
+          message: `অ্যাডমিন একাউন্টের সুরক্ষার্থে আপনার ইমেইলে (${masked}) ৬-সংখ্যার ওটিপি কোড পাঠানো হয়েছে।`
+        });
+      }
+
+      const record = admin2FACodes[user.email];
+      if (!record || Date.now() > record.expiresAt) {
+        return res.status(400).json({ success: false, message: 'ভেরিফিকেশন কোডের মেয়াদ শেষ হয়ে গেছে। অনুগ্রহ করে আবার লগইন করুন।' });
+      }
+      if (record.code !== twoFactorCode.toString().trim()) {
+        return res.status(400).json({ success: false, message: 'ভুল ভেরিফিকেশন কোড প্রদান করেছেন।' });
+      }
+      delete admin2FACodes[user.email];
+    }
 
     const token = jwt.sign({ id: user.id, email: user.email, username: user.username, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ success: true, message: 'লগইন সফল', token, user: { id: user.id, name: user.name, email: user.email, role: user.role, batch: user.batch, image: user.image, bloodGroup: user.bloodGroup, location: user.location, currentJob: user.currentJob } });
+    res.json({ 
+      success: true, 
+      message: 'লগইন সফল', 
+      token, 
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, batch: user.batch, image: user.image, bloodGroup: user.bloodGroup, location: user.location, currentJob: user.currentJob } 
+    });
   } catch (err: any) {
-    res.status(500).json({ success: false, message: 'লগইনে সমস্যা' });
+    res.status(500).json({ success: false, message: 'লগইনে সমস্যা: ' + err.message });
   }
 };
 
@@ -403,23 +522,5 @@ export const changeName = async (req: any, res: Response) => {
   } catch (err: any) {
     console.error('changeName error:', err);
     res.status(500).json({ success: false, message: 'সার্ভার সমস্যা: ' + err.message });
-  }
-};
-
-export const tempFixRoles = async (req: any, res: Response) => {
-  try {
-    const admins = await User.find({ role: { $in: ['admin', 'super-admin', 'super_admin'] } });
-    for (const admin of admins) {
-      if (admin.name && admin.name.includes('Jasmin')) {
-        const newRole = admin.role === 'super_admin' ? 'super-admin' : admin.role;
-        await User.updateOne({ _id: admin._id }, { $set: { name: '(প্রধান প্রশাসক)', role: newRole } });
-      }
-      if ((admin.name && admin.name.includes('Rofikul')) || admin.username === 'rofikul6424') {
-        await User.updateOne({ _id: admin._id }, { $set: { role: 'admin' } });
-      }
-    }
-    res.json({ success: true, message: 'Roles fixed successfully.' });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
   }
 };

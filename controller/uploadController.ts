@@ -16,9 +16,20 @@ export const uploadImage = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'কোনো ইমেজ দেওয়া হয়নি' });
     }
 
-    // Check if it's a base64 string
-    if (!image.startsWith('data:image') && !image.startsWith('data:video') && !image.startsWith('data:application/pdf')) {
-      return res.status(400).json({ success: false, message: 'ফাইলটি সঠিক ফরম্যাটে নেই (Base64 প্রয়োজন)' });
+    // Strict MIME whitelist validation for file uploads
+    const allowedMimePrefixes = [
+      'data:image/jpeg',
+      'data:image/jpg',
+      'data:image/png',
+      'data:image/webp',
+      'data:application/pdf'
+    ];
+    const isAllowed = allowedMimePrefixes.some(prefix => image.startsWith(prefix));
+    if (!isAllowed) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'শুধুমাত্র নিরাপদ ছবি (JPG, PNG, WebP) অথবা PDF ফাইল আপলোড করা যাবে।' 
+      });
     }
 
     // Upload to Cloudinary

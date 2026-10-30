@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { 
   sendVerification, verifyOtp, register, login, getMe, 
   checkAvailability, checkApplicationStatus,
-  forgotPassword, resetPassword, changePassword, changeEmail, changeName, tempFixRoles
+  forgotPassword, resetPassword, changePassword, changeEmail, changeName
 } from '../controller/authController';
 import { authenticateToken } from '../middleware/authMiddleware';
 import { registerLimiter, loginLimiter, otpLimiter } from '../middleware/rateLimiter';
@@ -23,6 +23,5 @@ router.post('/reset-password', resetPassword);
 router.post('/change-password', authenticateToken, changePassword);
 router.post('/change-email', authenticateToken, changeEmail);
 router.post('/change-name', authenticateToken, changeName);
-router.get('/fix-roles', tempFixRoles);
 
 export default router;
