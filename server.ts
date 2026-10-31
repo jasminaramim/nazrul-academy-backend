@@ -7,6 +7,7 @@ import routes from './routes/index';
 import { connectDB } from './config/dbConfig';
 
 import { apiLimiter } from './middleware/rateLimiter';
+import { xssSanitizer } from './middleware/xssSanitizer';
 
 // Load env - works both locally and on Vercel (via Vercel env vars)
 dotenv.config();
@@ -43,6 +44,7 @@ app.use(cors({
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(xssSanitizer); // Stored XSS & Script Tag Stripping
 
 // Global API Rate Limiting (DDoS & Scraping Protection)
 app.use('/api', apiLimiter);

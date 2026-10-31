@@ -32,6 +32,27 @@ export const uploadImage = async (req: Request, res: Response) => {
       });
     }
 
+    // 🔒 Anti-Webshell & Magic-Byte Validation (Binary Signature Verification)
+    try {
+      const base64Data = image.split(',')[1];
+      if (base64Data) {
+        const buffer = Buffer.from(base64Data.slice(0, 64), 'base64');
+        const isJpeg = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+        const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+        const isPdf = buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+        const isWebp = buffer.slice(0, 4).toString('ascii') === 'RIFF' && buffer.slice(8, 12).toString('ascii') === 'WEBP';
+
+        if (!isJpeg && !isPng && !isPdf && !isWebp) {
+          return res.status(400).json({
+            success: false,
+            message: 'ফাইলের বাইনারি সিগনেচার সঠিক নয়। কোনো ক্ষতিকর বা ছদ্মবেশী ফাইল আপলোড করা যাবে না।'
+          });
+        }
+      }
+    } catch (binErr) {
+      return res.status(400).json({ success: false, message: 'ফাইল ফরম্যাট প্রসেস করতে ব্যর্থ হয়েছে।' });
+    }
+
     // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(image, {
       folder: 'trishal_academy',

@@ -3,7 +3,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../model/userModel';
 import { GlobalConfig, Stats } from '../model/configModel';
-import { sendOTPEmail } from '../utils/emailService';
+import { sendOTPEmail, sendSecurityAlertEmail } from '../utils/emailService';
+import { recordSecurityAudit } from '../model/securityAuditModel';
 import { Student } from '../model/studentModel';
 import mongoose from 'mongoose';
 
@@ -11,6 +12,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'trishal-nazrul-academy-secret-key-
 const verificationCodes: Record<string, { code: string; expiresAt: number }> = {};
 export const verifiedEmails: Record<string, number> = {};
 const admin2FACodes: Record<string, { code: string; expiresAt: number }> = {};
+
+interface FailedLoginTracker {
+  attempts: number;
+  lastAttempt: number;
+  lockedUntil?: number;
+}
+export const failedLoginAttempts: Record<string, FailedLoginTracker> = {};
 
 export const sendVerification = async (req: Request, res: Response) => {
   try {
@@ -398,6 +406,57 @@ export const login = async (req: Request, res: Response) => {
     const rawIdentifier = (username || email || '').toString().trim().toLowerCase();
     if (!rawIdentifier || !password) return res.status(400).json({ success: false, message: 'তথ্য প্রদান করুন' });
 
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || req.ip || 'unknown';
+    const userAgent = (req.headers['user-agent'] as string) || 'unknown';
+    const lockKey = `${clientIp}_${rawIdentifier}`;
+
+    // 🔒 1. Check Brute-Force Lockout
+    const tracker = failedLoginAttempts[lockKey];
+    if (tracker?.lockedUntil && Date.now() < tracker.lockedUntil) {
+      const remainingMins = Math.ceil((tracker.lockedUntil - Date.now()) / (60 * 1000));
+      return res.status(429).json({
+        success: false,
+        message: `অতিরিক্ত ভুল লগইন চেষ্টার কারণে এই অ্যাকাউন্ট ও আইপি সাময়িকভাবে লক করা হয়েছে। অনুগ্রহ করে ${remainingMins} মিনিট পর চেষ্টা করুন।`
+      });
+    }
+
+    const handleFailure = async (reason: string) => {
+      const cur = failedLoginAttempts[lockKey] || { attempts: 0, lastAttempt: Date.now() };
+      cur.attempts += 1;
+      cur.lastAttempt = Date.now();
+
+      await recordSecurityAudit({
+        action: 'admin_login_failure',
+        performedBy: { email: rawIdentifier },
+        ipAddress: clientIp,
+        userAgent,
+        status: 'failure',
+        details: { reason, attemptCount: cur.attempts }
+      });
+
+      if (cur.attempts >= 5) {
+        cur.lockedUntil = Date.now() + 30 * 60 * 1000; // 30 minutes lockout
+        await recordSecurityAudit({
+          action: 'admin_account_locked',
+          performedBy: { email: rawIdentifier },
+          ipAddress: clientIp,
+          userAgent,
+          status: 'blocked',
+          details: { reason: '৫ বার ব্যর্থ লগইন চেষ্টা', lockedMinutes: 30 }
+        });
+
+        // Trigger real-time security alert email to super admin
+        sendSecurityAlertEmail({
+          to: process.env.EMAIL_USER || 'nazrulacademydarirampur@gmail.com',
+          targetAccount: rawIdentifier,
+          attackerIp: clientIp,
+          reason: 'টানা ৫ বার ভুল পাসওয়ার্ড/ওটিপি দেওয়ার কারণে অ্যাকাউন্টটি ৩০ মিনিটের জন্য লক করা হয়েছে।'
+        }).catch(err => console.error('[SecurityAlert] Email send failed:', err.message));
+      }
+
+      failedLoginAttempts[lockKey] = cur;
+    };
+
     const SUPER_ADMIN_USERNAME = (process.env.SUPER_ADMIN_USERNAME || 'admin').toLowerCase();
     const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'admin123';
 
@@ -420,6 +479,7 @@ export const login = async (req: Request, res: Response) => {
         { upsert: true, new: true }
       );
     } else if (!user) {
+      await handleFailure('ইউজার অ্যাকাউন্ট পাওয়া যায়নি');
       return res.status(401).json({ success: false, message: 'ভুল তথ্য' });
     }
 
@@ -427,6 +487,7 @@ export const login = async (req: Request, res: Response) => {
     const isSuperAdminPasswordMatch = (rawIdentifier === SUPER_ADMIN_USERNAME || user.username === SUPER_ADMIN_USERNAME) && password === SUPER_ADMIN_PASSWORD;
 
     if (!isMatch && !isSuperAdminPasswordMatch) {
+      await handleFailure('ভুল পাসওয়ার্ড');
       return res.status(401).json({ success: false, message: 'ভুল ইউজারনেম বা পাসওয়ার্ড' });
     }
 
@@ -461,13 +522,25 @@ export const login = async (req: Request, res: Response) => {
 
       const record = admin2FACodes[user.email];
       if (!record || Date.now() > record.expiresAt) {
+        await handleFailure('ওটিপি কোডের মেয়াদোত্তীর্ণ');
         return res.status(400).json({ success: false, message: 'ভেরিফিকেশন কোডের মেয়াদ শেষ হয়ে গেছে। অনুগ্রহ করে আবার লগইন করুন।' });
       }
       if (record.code !== twoFactorCode.toString().trim()) {
+        await handleFailure('ভুল ওটিপি কোড');
         return res.status(400).json({ success: false, message: 'ভুল ভেরিফিকেশন কোড প্রদান করেছেন।' });
       }
       delete admin2FACodes[user.email];
     }
+
+    // 🔒 Successful Login: Reset lockout tracker and record audit log
+    delete failedLoginAttempts[lockKey];
+    await recordSecurityAudit({
+      action: 'admin_login_success',
+      performedBy: { id: user.id, email: user.email, name: user.name, role: user.role },
+      ipAddress: clientIp,
+      userAgent,
+      status: 'success'
+    });
 
     const token = jwt.sign({ id: user.id, email: user.email, username: user.username, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ 

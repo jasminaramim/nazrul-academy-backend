@@ -8,7 +8,8 @@ import {
   getStats, updateStats,
   getMongoConfig, updateMongoConfig, forceMongoSync, seedDemoData, getMongoCollectionDocs,
   approveRegistration,
-  getAdmins, createAdmin, deleteAdmin, transferSuperAdmin
+  getAdmins, createAdmin, deleteAdmin, transferSuperAdmin,
+  getSecurityAuditLogs, exportDatabaseBackup
 } from '../controller/adminController';
 
 const router = Router();
@@ -42,5 +43,9 @@ router.get('/admins', authenticateToken, requireAdmin, getAdmins);
 router.post('/admins', authenticateToken, requireAdmin, createAdmin);
 router.delete('/admins/:id', authenticateToken, requireAdmin, deleteAdmin);
 router.put('/transfer', authenticateToken, requireAdmin, transferSuperAdmin);
+
+// --- Security Audit & Database Backup ---
+router.get('/security/audit-logs', authenticateToken, requireAdmin, getSecurityAuditLogs);
+router.get('/security/database-backup', authenticateToken, requireAdmin, exportDatabaseBackup);
 
 export default router;

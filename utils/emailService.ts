@@ -555,3 +555,54 @@ export async function resendEmailById(logId: string): Promise<{ success: boolean
     return { success: false, message: error.message || 'ইমেইল পুনরায় পাঠানো সম্ভব হয়নি।', log };
   }
 }
+
+// 4. Send Security Alert Email (Brute-force & Attack Detection)
+export async function sendSecurityAlertEmail({
+  to,
+  targetAccount,
+  attackerIp,
+  reason
+}: {
+  to: string;
+  targetAccount: string;
+  attackerIp: string;
+  reason: string;
+}): Promise<{ success: boolean; message: string }> {
+  const subject = '🚨 সিকিউরিটি অ্যালার্ট: নজরুল একাডেমি অ্যাডমিন প্যানেলে সন্দেহজনক লগইন চেষ্টা!';
+  const timeStr = new Date().toLocaleString('bn-BD', { timeZone: 'Asia/Dhaka' });
+  const htmlContent = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; border: 1px solid #fee2e2; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.1);">
+      <div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: #ffffff; padding: 28px 24px; text-align: center;">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 800;">🚨 সিকিউরিটি সতর্কতা অ্যালার্ট</h1>
+        <p style="margin: 6px 0 0; font-size: 13px; opacity: 0.9;">নজরুল একাডেমি অ্যাডমিন ডিফেন্স সিস্টেম</p>
+      </div>
+      <div style="padding: 26px 24px; color: #1e293b;">
+        <p style="font-size: 15px; line-height: 1.6; margin-top: 0;">
+          আপনার নজরুল একাডেমি অ্যাডমিন সিস্টেমে একটি সন্দেহজনক লগইন চেষ্টা শনাক্ত হয়েছে এবং প্রতিরোধমূলক ব্যবস্থা গ্রহণ করা হয়েছে:
+        </p>
+        <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 20px 0; border-radius: 6px;">
+          <p style="margin: 6px 0;"><strong>টার্গেট অ্যাকাউন্ট:</strong> ${targetAccount}</p>
+          <p style="margin: 6px 0;"><strong>আক্রমণকারীর আইপি (IP):</strong> ${attackerIp}</p>
+          <p style="margin: 6px 0;"><strong>শনাক্তের সময়:</strong> ${timeStr}</p>
+          <p style="margin: 6px 0; color: #b91c1c;"><strong>গৃহীত ব্যবস্থা:</strong> ${reason}</p>
+        </div>
+        <p style="font-size: 13px; color: #64748b; line-height: 1.5;">
+          🛡️ আপনি যদি নিজে এই চেষ্টা না করে থাকেন, তবে দুশ্চিন্তার কারণ নেই। সিস্টেম আক্রমণকারীকে ইতোমধ্যে ৩০ মিনিটের জন্য ব্লক করেছে এবং অ্যাডমিন একাউন্ট নিরাপদ রয়েছে।
+        </p>
+      </div>
+    </div>
+  `;
+
+  try {
+    const sendRes = await sendMailWithSmartFallback({
+      to,
+      subject,
+      html: htmlContent
+    });
+    return { success: true, message: 'সিকিউরিটি অ্যালার্ট ইমেইল সফলভাবে পাঠানো হয়েছে।' };
+  } catch (err: any) {
+    console.error('[SecurityAlert] Failed to send alert email:', err.message);
+    return { success: false, message: err.message };
+  }
+}
+
