@@ -1,4 +1,10 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
+
+// Ensure SRV records resolve cleanly on Windows and various ISPs
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch (_) {}
 
 export const DEFAULT_MONGODB_URI = process.env.MONGODB_URI || '';
 
