@@ -4,6 +4,7 @@ import { User } from '../model/userModel';
 import { Student } from '../model/studentModel';
 import { Donor } from '../model/miscModel';
 import { SecurityAudit, recordSecurityAudit } from '../model/securityAuditModel';
+import { sendStudentApprovalEmail } from '../utils/emailService';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 
@@ -71,8 +72,6 @@ export const getFinance = async (req: Request, res: Response) => {
     finance = finance.toObject();
 
     // Auto-fix old data if necessary
-    const Student = mongoose.model('Student');
-    const Donor = mongoose.model('Donor');
     const unassignedStudents = await Student.countDocuments({ $or: [{ reunionId: { $exists: false } }, { reunionId: null }, { reunionId: '' }] });
     if (unassignedStudents > 0) {
       const oldestReunion = await mongoose.model('Reunion').findOne().sort({ year: 1 });
@@ -181,14 +180,12 @@ export const getFinance = async (req: Request, res: Response) => {
 
 export const getGlobalFinance = async (req: Request, res: Response) => {
   try {
-    const Student = mongoose.model('Student');
     const studentAgg = await Student.aggregate([
       { $match: { status: 'approved' } },
       { $group: { _id: null, total: { $sum: { $convert: { input: "$registrationFee", to: "double", onError: 0, onNull: 0 } } } } }
     ]);
     const totalRegistrationIncome = studentAgg[0] ? studentAgg[0].total : 0;
 
-    const Donor = mongoose.model('Donor');
     const donorAgg = await Donor.aggregate([
       { $match: { status: 'approved' } },
       { $group: { _id: null, total: { $sum: { $convert: { input: "$amount", to: "double", onError: 0, onNull: 0 } } } } }
@@ -321,10 +318,6 @@ export const getMongoCollectionDocs = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
-
-import { Student } from '../model/studentModel';
-import { sendStudentApprovalEmail } from '../utils/emailService';
 
 export const approveRegistration = async (req: Request, res: Response) => {
   try {
