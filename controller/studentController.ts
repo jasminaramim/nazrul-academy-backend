@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { Student } from '../model/studentModel';
-import { Stats } from '../model/configModel';
+import { Stats, Finance } from '../model/configModel';
 import { User } from '../model/userModel';
+import mongoose from 'mongoose';
 
 export const getStudents = async (req: Request, res: Response) => {
   try {
@@ -31,13 +32,50 @@ export const getStudents = async (req: Request, res: Response) => {
 export const createStudent = async (req: Request, res: Response) => {
   try {
     const { id, ...rest } = req.body;
+    const studentId = 'std-' + Date.now();
     const newStudent = new Student({
-      id: 'std-' + Date.now(),
+      id: studentId,
       ...rest,
       status: req.body.status || 'approved',
     });
     await newStudent.save();
     await Stats.updateOne({}, { $inc: { registeredStudents: 1 } }, { upsert: true });
+
+    // ─── Finance: যদি admin-added student এর registrationFee > 0 হয় ───
+    // তাহলে Finance collection-এ income transaction যোগ করো
+    const fee = Number(rest.registrationFee) || 0;
+    if (fee > 0 && rest.adminAdded === true) {
+      try {
+        const activeReunion = await mongoose.model('Reunion').findOne({ isActive: true });
+        const financeQuery: any = activeReunion ? { reunionId: activeReunion.id } : {};
+
+        let finance: any = await Finance.findOne(financeQuery);
+        if (!finance) finance = await Finance.create(financeQuery);
+
+        const newTransaction = {
+          id: 'trx-adm-' + Date.now(),
+          type: 'income',
+          amount: fee,
+          source: 'Registration',       // ← getFinance() এই source দেখে double-count এড়ায়
+          fundSource: 'registration',
+          name: rest.name || 'অজানা',
+          category: 'অ্যাডমিন কর্তৃক ম্যানুয়াল নিবন্ধন',
+          title: `অ্যাডমিন নিবন্ধন — ${rest.name || ''}`,
+          date: new Date().toISOString().split('T')[0],
+          paymentMethod: rest.paymentMethod || 'cash',
+          transactionId: rest.transactionId || `ADMIN-${Date.now()}`,
+          reunionId: activeReunion?.id || null,
+        };
+
+        if (!Array.isArray(finance.transactions)) finance.transactions = [];
+        finance.transactions.push(newTransaction);
+        await finance.save();
+      } catch (finErr: any) {
+        // Finance update failure should NOT block student creation
+        console.error('[Finance] Admin-added student fee update failed:', finErr.message);
+      }
+    }
+
     res.status(201).json({ success: true, data: newStudent });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
